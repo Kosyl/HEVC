@@ -3,64 +3,89 @@
 
 #include <cassert>
 #include "Utils.h"
-#include "Cu.h"
+#include "CU.h"
+#include "UnitBase.h"
 
-class Pu;
+class PUIntra;
+class TB;
 
-class Pb
+class PBIntra : public UnitBase
 {
 private:
-	const Pu *pu;
-	ImgComp comp;
-	int const* const *picRecon;
-	int getReferenceAtPosition(const Direction, const int = 0) const;
-	bool calcPuAvail(const int, const int) const;
-	int getReconRef(const Direction, const int = 0) const;
-	int getRefSubs(const Direction) const;
+	TB *itsParentTB;
+	ImgComp itsComp;
+	Sample const* const *itsPicRecon;
+	Sample** itsPredictionTarget;
+	Sample** itsSideReferences;
+	Sample itsCornerReference;
+	Bool itsReferencesReady;
+	UInt itsModeIdx;
+
+	Bool calcPuAvail( const Int x, const Int y) const;
+	UShort getReferenceValue( const IntraDirection dir, const UInt offset = 0 ) const;
+	Void fillMissingReferences( Bool** sideAvailable, Bool cornerAvailable );
+
 public:
-	Pb(const Pu*, ImgComp comp);
-	~Pb();
-	void setPu(const Pu*);
-	void setPicRecon(int const* const*);
+	PBIntra( TB* parentTB, ImgComp comp, UInt x, UInt y, UInt size );
+	~PBIntra( );
 
-	ImgComp getImgComp()  const;
-	int getPuIdx() const;
-	int getPuSize() const;
-	int getModeIdx() const;
-	int getPuX() const;
-	int getPuY() const;
+	Void calcAndWritePredictionToCU( PUIntra* mainPU );
+	Void calcReferences( );
+	ImgComp getImgComp( ) const;
+	UInt getModeIdx( ) const;
+	UInt getPUIdx( ) const;
+	Void setModeIdx( UInt mode );
+	Sample getCornerReference( );
+	Sample* getSideRefs( const IntraDirection );
+	Sample **getPred( );
+	Sample **getPredForceRef( Sample* leftRefs, Sample* topRefs, Sample corner );
 
-	int getCorner() const;
-	int *getSideRefs(const Direction) const;
-	int **getPred() const;
-	int **getPredForceRef(int *leftRefs, int *topRefs, int corner) const;
+	virtual Void printDescription( );
 };
 
-class Pu
+class PUIntra : public CTUComponentBase
 {
 private:
-	Cu *cu;
-	Pb **blocks;
-	int puX, puY;
-	int puIdx, puSize, modeIdx;
-	int calcPuIdx(const int, const int) const;
+	CUIntra* itsParentCU;
+	UInt itsLumaModeIdx, itsChromaModeIdx;
+
+	std::shared_ptr<TUQuadTree> itsTransformArea;
+
 public:
-	Pu(Cu* cu, const int X, const int Y);
-	~Pu();
-	void setCu(Cu*);
-	void setPuIdx(const int);
-	void setPuSize(const int);
-	void setModeIdx(const int);
-	void setPicRecon(Frame* frame);
+	PUIntra( CUIntra* newCU, UInt X, UInt Y, UInt size );
+	~PUIntra( );
+	Void setLumaModeIdx( const UInt modeIdx )
+	{
+		assert( modeIdx >= 0 && modeIdx <= 34 );
+		itsLumaModeIdx = modeIdx;
+		itsChromaModeIdx = PUIntra::getModeForChroma( itsLumaModeIdx, itsParentCU->getIntraPredictionDerivationType( ) );
+	}
 
-	Cu *getCu() const;
-	int getPuIdx() const;
-	int getPuSize() const;
-	int getModeIdx() const;
-	int getPuX() const;
-	int getPuY() const;
+	virtual CUIntra* getCu( ) const
+	{
+		return itsParentCU;
+	}
+	UInt getModeIdx( ImgComp comp ) const
+	{
+		if( comp == LUMA )
+			return itsLumaModeIdx;
+		else
+			return itsChromaModeIdx;
+	}
 
-	int** getPred(ImgComp comp);
+	std::shared_ptr<TUQuadTree> getTransformArea( ) const
+	{
+		return itsTransformArea;
+	}
+	Void setTransformArea( std::shared_ptr<TUQuadTree> val )
+	{
+		itsTransformArea = val;
+	}
+
+	Void reconstructionLoop( );
+
+	static UInt getModeForChroma( UInt modeForLuma, UInt chromaPredictionDerivationMode );
+	virtual Void printDescription( );
 };
 
 #endif

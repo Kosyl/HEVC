@@ -12,23 +12,23 @@ class IntraPred
 {
   private:
     enum ModeType {PLANAR = 0, DC, LINEAR, ANGULAR};
-    static IntraPred *instance;
-    IntraMode **modes;
+    static IntraPred *itsInstance;
+    IntraMode **itsModes;
     const IntraPu *pu;
-    int corner;
-    int *leftRefs, *topRefs;
+    int itsCornerValue;
+    int *itsLeftRefs, *itsTopRefs;
     IntraPred();
-    int getFiltThresh() const;
-    bool isFiltReq() const;
+    int getFilteringThreshold() const;
+    bool isFilteringRequired() const;
     int filtRef(const int, const int, const int) const;
     void filterSideRefs(const Direction);
     void filter();
     bool checkSmoothCond(const Direction) const;
     bool isSmoothReq() const;
-    int smothRef(const Direction, const int) const;
+    int getSmoothedReferenceAtPosition(const Direction, const int) const;
     void smoothSideRefs(const Direction);
-    void smooth();
-    IntraMode *getStrategy();
+    void doReferenceSmoothing();
+    IntraMode *getPredictionStrategy();
   public:
     ~IntraPred();
     static IntraPred *getInstance();

@@ -26,7 +26,7 @@ PredParams *PredParams::getChromaInstance()
 int PredParams::getLumaMode(const int puSize)
 {
   PredParams *predParams = PredParams::getLumaInstance();
-  int puSizeIdx = log2(puSize) - 2;
+  int puSizeIdx = log2Int(puSize) - 2;
   int lumaMode = predParams->lumaModes[puSizeIdx];
   if (lumaMode == -1)
     lumaMode = predParams->selectLumaMode(puSize);
@@ -183,7 +183,7 @@ void PredWriter::storeReconSamples() const
 void PredWriter::switchToNextBlock()
 {
   SeqParams *seqParams = SeqParams::getInstance();
-  int maxBlockIdx = (int)pow(seqParams->getMaxCuSize()/8, 2);
+  int maxBlockIdx = (int)pow(seqParams->getMaxCUSize()/8, 2);
   blockIdx++;
   if (blockIdx == maxBlockIdx)
     blockIdx = 0;
@@ -232,7 +232,7 @@ void LumaPredWriter::storeBlock()
     updatePu();
     storeHeader(predFile);
     storePredSamples();
-    puSizes[log2(pu->getPuSize()) - 2] = true;
+    puSizes[log2Int(pu->getPuSize()) - 2] = true;
     predParams->switchToNextPos();
     contChecking = !predParams->firstPosition();
   }
@@ -315,7 +315,7 @@ void ChromaPredWriter::storeBlock()
         storePredSamples();
       }
       blockIdx = currBlockIdx;
-      puSizes[log2(pu->getPuSize()) - 2] = true;
+      puSizes[log2Int(pu->getPuSize()) - 2] = true;
     }
     predParams->switchToNextPos();
     contChecking = !predParams->firstPosition();
@@ -396,7 +396,7 @@ void DataGenerator::addLumaGroup(const int puSize, const int modeGroupIdx, const
 {
   PredParams *predParams = PredParams::getLumaInstance(); 
 
-  int puSizeMask = log2(puSize);
+  int puSizeMask = log2Int(puSize);
   if ((puSizes & puSizeMask) == 0)
     return;
 
@@ -489,7 +489,7 @@ void DataGenerator::storeSeqHeader(std::ofstream *targetFile)
   *targetFile << "Picture Height      : " << seqParams->getPicHeight() << "\n";
   *targetFile << "Bit Luma Depth      : " << seqParams->getBitDepthLuma() << "\n";
   *targetFile << "Bit Chroma Depth    : " << seqParams->getBitDepthChroma() << "\n";
-  *targetFile << "Max CU Size         : " << seqParams->getMaxCuSize() << "\n";
+  *targetFile << "Max CU Size         : " << seqParams->getMaxCUSize() << "\n";
   *targetFile << "Smoothing           : " << (int) seqParams->getSmoothEn() << "\n";
   *targetFile << "*************************************************" << std::endl;
 }

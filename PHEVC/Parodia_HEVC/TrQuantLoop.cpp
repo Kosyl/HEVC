@@ -74,27 +74,27 @@ void TrQuantLoop::deleteMatrices(int size)
 
 void TrQuantLoop::allocateMatrices(int blockSize)
 {
-	delta=new Short*[blockSize];
-	horTrans=new Short*[blockSize];
-	vertTrans=new Short*[blockSize];
-	quant=new Short*[blockSize];
-	dequant=new Short*[blockSize];
-	invVertTrans=new Short*[blockSize];
-	invHorTrans=new Short*[blockSize];
+	delta=new Sample*[blockSize];
+	horTrans=new Coeff*[blockSize];
+	vertTrans = new Coeff*[ blockSize ];
+	quant = new Coeff*[ blockSize ];
+	dequant = new Coeff*[ blockSize ];
+	invVertTrans = new Coeff*[ blockSize ];
+	invHorTrans = new Sample*[ blockSize ];
 
 	for(int i=0;i<blockSize;++i)
 	{
-		delta[i]=new Short[blockSize];
-		horTrans[i]=new Short[blockSize];
-		vertTrans[i]=new Short[blockSize];
-		quant[i]=new Short[blockSize];
-		dequant[i]=new Short[blockSize];
-		invVertTrans[i]=new Short[blockSize];
-		invHorTrans[i]=new Short[blockSize];
+		delta[ i ] = new Sample[ blockSize ];
+		horTrans[ i ] = new Coeff[ blockSize ];
+		vertTrans[ i ] = new Coeff[ blockSize ];
+		quant[ i ] = new Coeff[ blockSize ];
+		dequant[ i ] = new Coeff[ blockSize ];
+		invVertTrans[ i ] = new Coeff[ blockSize ];
+		invHorTrans[ i ] = new Sample[ blockSize ];
 	}
 }
 
-void TrQuantLoop::TrQuantDequantItr(Short** const block, Short** residuals, Short** result, const Int& QP, const Int& bitDepth, const Int& blockSize, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver)
+void TrQuantLoop::TrQuantDequantItr( Sample** const block, Sample** residuals, Sample** result, const Int& QP, const Int& bitDepth, const Int& blockSize, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver )
 {
 	deleteMatrices(prevBlockSize);
 	prevBlockSize=blockSize;

@@ -6,10 +6,11 @@
 #include <fstream>
 #include <string.h>
 #include <sstream>
+#include <vector>
+#include <map>
 
 class Logger
 {
-
 private:
 
 	std::string m_logPath; ///< sciezka do pliku logu
@@ -57,7 +58,6 @@ private:
 	}
 
 public:
-	
 	Logger();
 	Logger(std::string logPath, Bool isLogging);
 	~Logger();
@@ -87,6 +87,8 @@ public:
 	Void setTabLength(UInt len);
 	Void setTabStep(UInt len);
 	
+	std::ofstream& getStream( );
+
 	template<typename T>
 	Void write(T s);
 };
@@ -94,5 +96,36 @@ public:
 #include "LoggerImpl.h"
 
 Logger& operator<<(Logger& o, std::ostream& (*f)(std::ostream&));
+
+class LoggingControl
+{
+private:
+
+	static LoggingControl *instance;
+	static std::string mainSettingsPath;
+	std::vector<std::string> logNames;
+
+	LoggingControl( );
+
+	void LoadSettings( );
+
+public:
+
+	static std::string lastKey;
+	static LoggingControl* getInstance( );
+	~LoggingControl( );
+
+	//std::map<std::string, std::ofstream*> logs;
+	std::map<std::string, Logger*> logs;
+	std::map<std::string, bool> triggers;
+
+	static void increaseTabsLength( int len );
+	static void decreaseTabsLength( int len );
+};
+
+Logger& LOG( std::string key );
+
+Void LOG_TAB( std::string key = "" );
+Void LOG_UNTAB( std::string key = "" );
 
 #endif

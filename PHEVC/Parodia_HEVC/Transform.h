@@ -19,10 +19,10 @@ public:
 	static Transform* getInstance();
 	~Transform();
 
-	void forwardTrans(Short** const block, Short** coeff, const Int& trSize, const Int& bitDepth, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver);
-	void inverseTrans(Short** const coeff, Short** block, const Int& trSize, const Int& bitDepth, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver);
-	void forwardTrans(Short** const block, Short** coeff, const Int& totalSize, const Int& trSize, const Int& bitDepth, const Int& offset_hor, const Int& offset_ver, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver);
-	void inverseTrans(Short** const coeff, Short** block, const Int& totalSize, const Int& trSize, const Int& bitDepth, const Int& offset_hor, const Int& offset_ver, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver);
+	void forwardTrans(Sample** const block, Coeff** coeff, const Int& trSize, const Int& bitDepth, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver);
+	void inverseTrans( Coeff** const coeff, Sample** block, const Int& trSize, const Int& bitDepth, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver );
+	void forwardTrans( Sample** const block, Coeff** coeff, const Int& totalSize, const Int& trSize, const Int& bitDepth, const Int& offset_hor, const Int& offset_ver, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver );
+	void inverseTrans( Coeff** const coeff, Sample** block, const Int& totalSize, const Int& trSize, const Int& bitDepth, const Int& offset_hor, const Int& offset_ver, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver );
 
 	Int** afterHor; ///< tablica tymczasowa przechowujaca wynik transformaty poziomej do wgladu
 

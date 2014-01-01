@@ -10,7 +10,7 @@ int main(int argc, char* argv[])
 	srand(time(NULL));
 
 	int size = 4;
-	int num = 100;
+	int num = 500;
 	
 	ofstream myfile ("D:\\txt\\macierze4x4.txt");
 

@@ -10,11 +10,11 @@
 #include "TypeDef.h"
 #include "TrQuantLoop.h"
 #include "Utils.h"
-#include "Frame.h"
+#include "Picture.h"
 #include "Binarization.h"
-
-#include "Pu.h"
-#include "Cu.h"
+#include "PartitioningStrategy.h"
+#include "PU.h"
+#include "CU.h"
 
 #include <time.h>
 #include <stdlib.h>
@@ -22,6 +22,8 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <string>
+#include <iomanip> 
 
 using namespace std;
 
@@ -33,162 +35,182 @@ using namespace std;
 *	\param q obiekt liczacy kwantyzacje i dekwwantyzacje
 *	\param qp parametr kwantyzacji
 */
-//void test(Short** tab, Int bok, Transform& tr, Quant& q, Int qp)
-//{
-//	Short** resNxN = new Short*[bok]; // tablica na wynik transformacji prostej
-//	for(Int i=0;i<bok;++i){resNxN[i]=new Short[bok]; memset(resNxN[i],0,bok*sizeof(Short));}
+void test( Short** tab, Int bok, Transform& tr, Quant& q, Int qp )
+{
+	Coeff** resNxN = new Coeff*[ bok ]; // tablica na wynik transformacji prostej
+	for( Int i = 0; i < bok; ++i )
+	{
+		resNxN[ i ] = new Coeff[ bok ]; memset( resNxN[ i ], 0, bok*sizeof( Short ) );
+	}
+
+	Coeff** quantresNxN = new Coeff*[ bok ]; // tablica na wynik kwantyzacji
+	for( Int i = 0; i < bok; ++i )
+	{
+		quantresNxN[ i ] = new Coeff[ bok ]; memset( quantresNxN[ i ], 0, bok*sizeof( Short ) );
+	}
+
+	Coeff** dequantresNxN = new Coeff*[ bok ]; // tablica na wynik dekwantyzacji
+	for( Int i = 0; i < bok; ++i )
+	{
+		dequantresNxN[ i ] = new Coeff[ bok ]; memset( dequantresNxN[ i ], 0, bok*sizeof( Short ) );
+	}
+
+	Sample** invresNxN = new Sample*[ bok ]; // tablica na wynik transformacji odwrotnej
+	for( Int i = 0; i < bok; ++i )invresNxN[ i ] = new Sample[ bok ];
+
+	//policzenie wynikow, jesli 'tr' lub 'q' maja wlaczone logowanie, takze ono nastepuje
+	tr.forwardTrans( tab, resNxN, bok, 8, true, true );
+	q.quant( resNxN, quantresNxN, qp, 8, bok, bok );
+	q.deQuant( quantresNxN, dequantresNxN, qp, 8, bok, bok );
+	tr.inverseTrans( dequantresNxN, invresNxN, bok, 8, true, true );
+
+	for( int i = 0; i < bok; ++i )
+	{
+		delete[] resNxN[ i ];
+		delete[] invresNxN[ i ];
+	}
+	delete[] resNxN;
+	delete[] invresNxN;
+}
 //
-//	Short** quantresNxN = new Short*[bok]; // tablica na wynik kwantyzacji
-//	for(Int i=0;i<bok;++i){quantresNxN[i]=new Short[bok]; memset(quantresNxN[i],0,bok*sizeof(Short));}
+/**
+*	Funkcja liczy transformate przez mnozenie macierzy dla tablic 2D (ew. DST), dla bloku MxM liczy transformaty NxN, gdzie M=k*N
+*	\param tab wskaznik na dwuwymiarowa tablice probek o wymiarach totalSize x totalSize
+*	\param totalSize calkowity wymiar bloku probek
+*	\param trSize wymiar transformaty (totalSize = k*trSize)
+*	\param tr obiekt liczacy transformate prosta i odwrotna
+*	\param q obiekt liczacy kwantyzacje i dekwwantyzacje
+*	\param qp parametr kwantyzacji
+*/
+void splittest( Short** tab, Int totalSize, Int trSize, Transform& tr, Quant& q, Int qp )
+{
+	Coeff** resNxN = new Coeff*[ totalSize ]; // tablica na wynik transformacji prostej
+	for( Int i = 0; i < totalSize; ++i )
+	{
+		resNxN[ i ] = new Coeff[ totalSize ]; memset( resNxN[ i ], 0, totalSize*sizeof( Short ) );
+	}
+
+	Coeff** quantresNxN = new Coeff*[ totalSize ]; // tablica na wynik kwantyzacji
+	for( Int i = 0; i < totalSize; ++i )
+	{
+		quantresNxN[ i ] = new Coeff[ totalSize ]; memset( quantresNxN[ i ], 0, totalSize*sizeof( Short ) );
+	}
+
+	Coeff** dequantresNxN = new Coeff*[ totalSize ]; // tablica na wynik dekwantyzacji
+	for( Int i = 0; i < totalSize; ++i )
+	{
+		dequantresNxN[ i ] = new Coeff[ totalSize ]; memset( dequantresNxN[ i ], 0, totalSize*sizeof( Short ) );
+	}
+
+	Sample** invresNxN = new Sample*[ totalSize ]; // tablica na wynik transformacji odwrotnej
+	for( Int i = 0; i < totalSize; ++i )invresNxN[ i ] = new Sample[ totalSize ];
+
+	for( int i = 0; i <= totalSize - trSize; i += trSize )
+	{
+		for( int j = 0; j <= totalSize - trSize; j += trSize )
+		{
+			tr.forwardTrans( tab, resNxN, totalSize, trSize, 8, i, j, false, false );
+		}
+	}
+	q.quant( resNxN, quantresNxN, qp, 8, totalSize, trSize );
+	q.deQuant( quantresNxN, dequantresNxN, qp, 8, totalSize, trSize );
+	for( int i = 0; i <= totalSize - trSize; i += trSize )
+	{
+		for( int j = 0; j <= totalSize - trSize; j += trSize )
+		{
+			tr.inverseTrans( dequantresNxN, invresNxN, totalSize, trSize, 8, i, j, false, false );
+		}
+	}
+
+	for( int i = 0; i < totalSize; ++i )
+	{
+
+		delete[] resNxN[ i ];
+		delete[] invresNxN[ i ];
+	}
+	delete[] resNxN;
+	delete[] invresNxN;
+}
 //
-//	Short** dequantresNxN = new Short*[bok]; // tablica na wynik dekwantyzacji
-//	for(Int i=0;i<bok;++i){dequantresNxN[i]=new Short[bok]; memset(dequantresNxN[i],0,bok*sizeof(Short));}
-//
-//	Short** invresNxN = new Short*[bok]; // tablica na wynik transformacji odwrotnej
-//	for(Int i=0;i<bok;++i)invresNxN[i]=new Short[bok];
-//
-//	//policzenie wynikow, jesli 'tr' lub 'q' maja wlaczone logowanie, takze ono nastepuje
-//	tr.forwardTrans(tab,resNxN,bok,8,false,false);
-//	q.quant(resNxN,quantresNxN,qp,8,bok,bok);
-//	q.deQuant(quantresNxN,dequantresNxN,qp,8,bok,bok);
-//	tr.inverseTrans(dequantresNxN,invresNxN,bok,8,false,false);
-//
-//	for(int i=0;i<bok;++i)
-//	{
-//		delete[] resNxN[i];
-//		delete[] invresNxN[i];
-//	}
-//	delete[] resNxN;
-//	delete[] invresNxN;
-//}
-//
-///**
-//*	Funkcja liczy transformate przez mnozenie macierzy dla tablic 2D (ew. DST), dla bloku MxM liczy transformaty NxN, gdzie M=k*N
-//*	\param tab wskaznik na dwuwymiarowa tablice probek o wymiarach totalSize x totalSize
-//*	\param totalSize calkowity wymiar bloku probek
-//*	\param trSize wymiar transformaty (totalSize = k*trSize)
-//*	\param tr obiekt liczacy transformate prosta i odwrotna
-//*	\param q obiekt liczacy kwantyzacje i dekwwantyzacje
-//*	\param qp parametr kwantyzacji
-//*/
-//void splittest(Short** tab, Int totalSize, Int trSize, Transform& tr, Quant& q, Int qp)
-//{
-//	Short** resNxN = new Short*[totalSize]; // tablica na wynik transformacji prostej
-//	for(Int i=0;i<totalSize;++i){resNxN[i]=new Short[totalSize]; memset(resNxN[i],0,totalSize*sizeof(Short));}
-//
-//	Short** quantresNxN = new Short*[totalSize]; // tablica na wynik kwantyzacji
-//	for(Int i=0;i<totalSize;++i){quantresNxN[i]=new Short[totalSize]; memset(quantresNxN[i],0,totalSize*sizeof(Short));}
-//
-//	Short** dequantresNxN = new Short*[totalSize]; // tablica na wynik dekwantyzacji
-//	for(Int i=0;i<totalSize;++i){dequantresNxN[i]=new Short[totalSize]; memset(dequantresNxN[i],0,totalSize*sizeof(Short));}
-//
-//	Short** invresNxN = new Short*[totalSize]; // tablica na wynik transformacji odwrotnej
-//	for(Int i=0;i<totalSize;++i)invresNxN[i]=new Short[totalSize];
-//
-//	for(int i=0;i<=totalSize-trSize;i+=trSize)
-//	{
-//		for(int j=0;j<=totalSize-trSize;j+=trSize)
-//		{
-//			tr.forwardTrans(tab,resNxN,totalSize,trSize,8,i,j,false,false);
-//		}
-//	}
-//	q.quant(resNxN,quantresNxN,qp,8,totalSize,trSize);
-//	q.deQuant(quantresNxN,dequantresNxN,qp,8,totalSize,trSize);
-//	for(int i=0;i<=totalSize-trSize;i+=trSize)
-//	{
-//		for(int j=0;j<=totalSize-trSize;j+=trSize)
-//		{
-//			tr.inverseTrans(dequantresNxN,invresNxN,totalSize,trSize,8,i,j,false,false);
-//		}
-//	}
-//
-//	for(int i=0;i<totalSize;++i)
-//	{
-//
-//		delete[] resNxN[i];
-//		delete[] invresNxN[i];
-//	}
-//	delete[] resNxN;
-//	delete[] invresNxN;
-//}
-//
-//void classicTest()
-//{
-//	srand((unsigned int)time(NULL));
-//
-//	Int bok = 4; // rozmiar bloku
-//	Int realsize; // rozmiar transformaty (niekoniecznie == rozmiarowi bloku!)
-//
-//	string s;
-//	ifstream input("D:\\txt\\macierze4x4.txt"); // strumien z macierzami wejsciowymi
-//	int count=0;
-//
-//	//konstruktorom przekazujemy sciezki plikow logow i wlaczamy logowanie
-//	Transform t("D:\\txt\\tlog_qp25.txt",true); 
-//	Quant q("D:\\txt\\qlog_qp25.txt",true); 
-//
-//	//wylaczamy detale typu podawanie shiftow, offsetow itp
-//	q.log.includeDetails=false;
-//	t.log.includeDetails=false;
-//
-//	Short** tab4; // tablica dla transformat 4x4 liczonych w blokach 8x8
-//	tab4=new Short*[8];
-//	for(int i=0;i<8;++i)tab4[i]=new Short[8];
-//	int ofs1=0,ofs2=0,ofsum=0;
-//
-//	Short** tab;
-//	input >> s;
-//	cout << s;
-//	while(s[0]=='*')
-//	{
-//		count++;
-//		cout << count << endl;
-//		input >> realsize; // pierwszy wiersz po "***" to rozmiar macierzy
-//		bok=realsize;
-//		Int qp=25;//rand()%31;
-//
-//		if(0)
-//			//if(realsize==4) // kolekcjonujemy paczki po 4 macierze 4x4 i robimy z nich 8x8
-//		{
-//			for(int i=ofs1;i<bok+ofs1;++i)
-//			{
-//				for(int j=ofs2;j<bok+ofs2;++j)
-//				{
-//					input >> tab4[i][j];
-//				}
-//			}
-//			if(ofs1==4 && ofs2==4) // gdy tablica 8x8 jest pelna
-//			{
-//				splittest(tab4,8,4,t,q,qp);
-//			}
-//			ofsum++;
-//			ofs1=4*(ofsum%2);
-//			ofs2=4*(ofsum/2);
-//			if(ofsum==4) //kolekcjonujemy od nowa zestaw czterech macierzy 4x4
-//			{
-//				ofs1=0;ofs2=0;ofsum=0;
-//			}
-//		}
-//		else
-//		{
-//			tab = new Short*[bok];
-//			for(Int i=0;i<bok;++i)tab[i] = new Short[bok];
-//
-//			for(int i=0;i<bok;++i)
-//			{
-//				for(int j=0;j<bok;++j)
-//				{
-//					input >> tab[i][j];
-//				}
-//			}
-//			test(tab,bok,t,q,qp);
-//		}
-//		input >> s;
-//	}
-//	for(int i=0;i<bok;++i)delete[] tab[i];
-//	delete[] tab;
-//	input.close();
-//}
+void classicTest( )
+{
+	srand( (unsigned int)time( NULL ) );
+
+	Int bok = 4; // rozmiar bloku
+	Int realsize; // rozmiar transformaty (niekoniecznie == rozmiarowi bloku!)
+
+	string s;
+	ifstream input( "D:\\txt\\macierze4x4.txt" ); // strumien z macierzami wejsciowymi
+	int count = 0;
+
+	//konstruktorom przekazujemy sciezki plikow logow i wlaczamy logowanie
+	Transform* t = Transform::getInstance( );
+	t->initLog( "D:\\txt\\tlog_qp10.txt", true );
+	Quant* q = Quant::getInstance( );
+	q->initLog( "D:\\txt\\qlog_qp10.txt", true );
+
+	//wylaczamy detale typu podawanie shiftow, offsetow itp
+	q->log.includeDetails = false;
+	t->log.includeDetails = false;
+
+	Short** tab4; // tablica dla transformat 4x4 liczonych w blokach 8x8
+	tab4 = new Short*[ 8 ];
+	for( int i = 0; i < 8; ++i )tab4[ i ] = new Short[ 8 ];
+	int ofs1 = 0, ofs2 = 0, ofsum = 0;
+
+	Short** tab;
+	input >> s;
+	cout << s;
+	while( s[ 0 ] == '*' )
+	{
+		count++;
+		cout << count << endl;
+		input >> realsize; // pierwszy wiersz po "***" to rozmiar macierzy
+		bok = realsize;
+		Int qp = 10;//rand()%31;
+
+		if( 0 )
+			//if(realsize==4) // kolekcjonujemy paczki po 4 macierze 4x4 i robimy z nich 8x8
+		{
+			for( int i = ofs1; i < bok + ofs1; ++i )
+			{
+				for( int j = ofs2; j < bok + ofs2; ++j )
+				{
+					input >> tab4[ i ][ j ];
+				}
+			}
+			if( ofs1 == 4 && ofs2 == 4 ) // gdy tablica 8x8 jest pelna
+			{
+				splittest( tab4, 8, 4, *t, *q, qp );
+			}
+			ofsum++;
+			ofs1 = 4 * ( ofsum % 2 );
+			ofs2 = 4 * ( ofsum / 2 );
+			if( ofsum == 4 ) //kolekcjonujemy od nowa zestaw czterech macierzy 4x4
+			{
+				ofs1 = 0; ofs2 = 0; ofsum = 0;
+			}
+		}
+		else
+		{
+			tab = new Short*[ bok ];
+			for( Int i = 0; i < bok; ++i )tab[ i ] = new Short[ bok ];
+
+			for( int i = 0; i < bok; ++i )
+			{
+				for( int j = 0; j < bok; ++j )
+				{
+					input >> tab[ i ][ j ];
+				}
+			}
+			test( tab, bok, *t, *q, qp );
+		}
+		input >> s;
+	}
+	for( int i = 0; i < bok; ++i )delete[] tab[ i ];
+	delete[] tab;
+	input.close( );
+}
 //
 //void forwardAndBackwardTest()
 //{
@@ -679,86 +701,109 @@ using namespace std;
 //	printMatrix(reco,imgH,std::cout);
 //}
 
-void predictionTest()
+//void predictionTest( )
+//{
+//	/*int size=8;
+//	int imgH=176;
+//	int imgW=144;*/
+//	int size = 4;
+//	UInt imgH = 20;
+//	int imgW = 20;
+//
+//	Picture f;
+//	f.setSize( imgW, imgH );
+//	std::ifstream yuv( "D:\\h265\\yuv\\akiyo_qcif.yuv", ios::in | ios::binary );
+//
+//	int** reco = getEmptyMatrix<int>( imgW, imgH );
+//
+//	int* leftRefs = new int[ 2 * size ];
+//	int* topRefs = new int[ 2 * size ];
+//	int corner;
+//
+//	f.loadFrameFromYuv( yuv );
+//	int** img = f.reconMatrix( LUMA );
+//	/*for(int i=0;i<imgW;++i)
+//	{
+//	img[i][0]=rand()%256;
+//	}*/
+//	img[ 0 ][ 5 ] = 60;
+//	img[ 5 ][ 0 ] = 100;
+//
+//	printMatrix<UShort>( f.samples( LUMA ), imgH, std::cout );
+//	std::cout << std::endl;
+//	printMatrix<int>( img, imgH, std::cout );
+//	std::cout << std::endl;
+//
+//	SequenceParameters* SPM = SequenceParameters::getInstance( );
+//	SPM->setBitDepthChroma( 8 );
+//	SPM->setBitDepthLuma( 8 );
+//	SPM->setMaxCuSize( 64 );
+//	SPM->setPicHeight( imgH );
+//	SPM->setPicWidth( imgW );
+//	SPM->setIntraSmoothingEnabled( false );
+//
+//	CU cu( &f, 1, 1, 8 );
+//	PU* pu = new PU( &cu, 1, 1 );
+//	pu->setPuSize( 8 );
+//	cu.addPu( *pu );
+//	pu->setModeIdx( 1 );
+//	int** res = pu->getPred( LUMA );
+//	printMatrix<int>( res, 8, std::cout );
+//}
+
+void binarizationTest( )
 {
-	/*int size=8;
-	int imgH=176;
-	int imgW=144;*/
-	int size=4;
-	int imgH=20;
-	int imgW=20;
+	Binarization b( "D:\\txt\\binlog.txt", true );
 
-	Frame f;
-	f.setSize(imgW,imgH);
-	std::ifstream yuv("D:\\h265\\yuv\\akiyo_qcif.yuv", ios::in|ios::binary);
+	ifstream input( "D:\\txt\\ec_summary.txt" ); //strumien z macierzami wejsciowymi
+	UInt bins;
 
-	int** reco = getEmptyMatrix<int>(imgW,imgH);
-
-	int* leftRefs = new int[2*size];
-	int* topRefs = new int[2*size];
-	int corner;
-
-	f.loadFrameFromYuv(yuv);
-	int** img = f.reconMatrix(LUMA);
-	/*for(int i=0;i<imgW;++i)
+	Short** matrix;
+	do
 	{
-	img[i][0]=rand()%256;
-	}*/
-	img[0][5]=60;
-	img[5][0]=100;
+		loadNextMatrix( input, matrix, bins, 4 );
 
-	printMatrix<int>(f.samples(LUMA),imgH,std::cout);
-	std::cout << std::endl;
-	printMatrix<int>(img,imgH,std::cout);
-	std::cout << std::endl;
+		UInt res = b.countBinsIn4x4TU( matrix, new DiagonalScanningMode( ) );
+		cout << "modelowo: " << bins << std::endl;
+		cout << std::endl;
+	}
+	while( !input.eof( ) );
 
-	SeqParams* SPM = SeqParams::getInstance();
-	SPM->setBitDepthChroma(8);
-	SPM->setBitDepthLuma(8);
-	SPM->setMaxCuSize(64);
-	SPM->setPicHeight(imgH);
-	SPM->setPicWidth(imgW);
-	SPM->setSmoothEn(false);
-
-	Cu cu(&f, 1, 1, 8);
-	Pu* pu = new Pu(&cu,1,1);
-	pu->setPuSize(8);
-	cu.addPu(*pu);
-	pu->setModeIdx(1);
-	int** res = pu->getPred(LUMA);
-	printMatrix<int>(res,8,std::cout);
+	deleteMatrix( matrix, 4 );
 }
 
-void binarizationTest()
+void pictureTest( )
 {
-	Binarization b("D:\\txt\\bintest.txt",true);
+	SeqParams( )->setPicWidth( 16 );
+	SeqParams( )->setPicHeight( 16 );
+	ZScanArray::reset( );
+	std::auto_ptr<Picture> f( new Picture( ) );
+	std::ifstream yuv( "D:\\h265\\yuv\\akiyo_qcif.yuv", ios::in | ios::binary );
+	std::ofstream out;
+	out.open( "D:\\txt\\reconstruction.txt", std::fstream::out | std::fstream::ate );
+	f->loadFrameFromYuv( yuv );
+	f->initPartitions( DefaultSmallPartitions::getStrategy( ) );
+	f->printDescription( );
 
-	UInt bits;
-	for(UInt remain = 0; remain < 255; ++remain)
-	{
-		for(UInt riceParam = 0; riceParam < 5; ++riceParam)
-		{
-			cout << "(" << remain << "," << riceParam << ")" << std::endl;
-			bits = b.binarizeCoefficientRemainingLevel_NumBits(remain,riceParam);
-			b.log << "********************************************" << std::endl;
-		}
-	}
+	f->reconstructionLoop( );
 }
 
 /**
 *	Funkcja glowna, dokonuje testow na macierzach z podanego pliku
 */
-Int main(Int argc, Char* argv[])
-{	
+Int main( Int argc, Char* argv[] )
+{
 	//classicTest();
 
 	//forwardAndBackwardTest();
 
 	//predictionTest();
 
-	binarizationTest();
+	//binarizationTest( );
 
-	system("PAUSE");
+	pictureTest( );
+
+	system( "PAUSE" );
 
 	return EXIT_SUCCESS;
 }

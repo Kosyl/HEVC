@@ -32,8 +32,8 @@ bool IntraCu::isCompCompleted(const ImgComp comp) const
   SeqParams *seqParams = SeqParams::getInstance();
   IntraPu *pu = puList[comp];
 
-  int lastIdx = pow(seqParams->getMaxCuSize()/(comp == LUMA ? 4 : 8), 2);
-  int maxCuSize = seqParams->getMaxCuSize()/(comp == LUMA ? 1 : 2);
+  int lastIdx = pow(seqParams->getMaxCUSize()/(comp == LUMA ? 4 : 8), 2);
+  int maxCuSize = seqParams->getMaxCUSize()/(comp == LUMA ? 1 : 2);
   int picWidth = seqParams->getPicWidth()/(comp == LUMA ? 1 : 2);
   int picHeight = seqParams->getPicHeight()/(comp == LUMA ? 1 : 2);
 
@@ -84,19 +84,19 @@ int IntraCu::getCuY() const
 int IntraCu::getCuWidth() const
 {
   SeqParams *seqParams = SeqParams::getInstance();
-  if (seqParams->getPicWidth() - cuX < seqParams->getMaxCuSize())
+  if (seqParams->getPicWidth() - cuX < seqParams->getMaxCUSize())
     return seqParams->getPicWidth() - cuX;
   else
-    return seqParams->getMaxCuSize();
+    return seqParams->getMaxCUSize();
 }
 
 int IntraCu::getCuHeight() const
 {
   SeqParams *seqParams = SeqParams::getInstance();
-  if (seqParams->getPicHeight() - cuY < seqParams->getMaxCuSize())
+  if (seqParams->getPicHeight() - cuY < seqParams->getMaxCUSize())
     return seqParams->getPicHeight() - cuY;
   else
-    return seqParams->getMaxCuSize();
+    return seqParams->getMaxCUSize();
 }
 
 bool IntraCu::isCuCompleted() const
@@ -111,11 +111,11 @@ bool IntraCu::switchToNextCu()
   for (int comp = 0; comp < 3; comp++)
     resetPu(ImgComp(comp));
 
-  cuX += seqParams->getMaxCuSize();
+  cuX += seqParams->getMaxCUSize();
   if (cuX >= seqParams->getPicWidth())
   {
     cuX = 0;
-    cuY += seqParams->getMaxCuSize();
+    cuY += seqParams->getMaxCUSize();
     if (cuY >= seqParams->getPicHeight())
     {
       cuY = 0;

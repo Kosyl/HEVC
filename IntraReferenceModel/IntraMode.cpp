@@ -26,14 +26,14 @@ void IntraMode::setPu(const IntraPu *newPu)
 
 void IntraMode::setCorner(const int newCorner)
 {
-  corner = newCorner;
+  itsCornerReference = newCorner;
 }
 
 void IntraMode::setSideRefs(const Direction dir, const int *refs)
 {
-  assert(dir != CORNER_DIR);
+  assert(dir != INTRA_DIR_CORNER);
 
-  if (dir == LEFT_DIR)
+  if (dir == INTRA_DIR_LEFT)
     leftRefs = refs;
   else
     topRefs = refs;
@@ -52,7 +52,7 @@ int **PlanarMode::calcPred()
   assert(pu != nullptr);
   assert((leftRefs != nullptr) || (topRefs != nullptr));
 
-  int log2PuSize = log2(pu->getPuSize());
+  int log2PuSize = log2Int(pu->getPuSize());
 
   int **pred = initPred();
   for (int x = 0; x < pu->getPuSize(); x++)
@@ -81,7 +81,7 @@ void DcMode::calcDcVal()
   dcVal = pu->getPuSize();
   for (int x = 0; x < pu->getPuSize(); x++)
     dcVal += leftRefs[x] + topRefs[x];
-  dcVal >>= log2(pu->getPuSize()) + 1;
+  dcVal >>= log2Int(pu->getPuSize()) + 1;
 }
 
 int DcMode::getFiltCorner() const
@@ -95,10 +95,10 @@ int DcMode::getFiltCorner() const
 
 int DcMode::getFiltEdge(const Direction dir, const int offset) const
 {
-  assert(dir != CORNER_DIR);
+  assert(dir != INTRA_DIR_CORNER);
   assert((offset >= 0) && (offset < pu->getPuSize()));
 
-  const int *refs = dir == LEFT_DIR ? leftRefs : topRefs;
+  const int *refs = dir == INTRA_DIR_LEFT ? leftRefs : topRefs;
   bool filtRef = (pu->getImgComp() == LUMA) && (pu->getPuSize() < 32);
 
   if (filtRef)
@@ -118,8 +118,8 @@ int **DcMode::calcPred()
   pred[0][0] = getFiltCorner();
   for (int x = 1; x < pu->getPuSize(); x++)
   {
-    pred[0][x] = getFiltEdge(LEFT_DIR, x);
-    pred[x][0] = getFiltEdge(TOP_DIR, x);
+    pred[0][x] = getFiltEdge(INTRA_DIR_LEFT, x);
+    pred[x][0] = getFiltEdge(INTRA_DIR_TOP, x);
   }
 
   for (int x = 1; x < pu->getPuSize(); x++)
@@ -139,9 +139,9 @@ LinearMode::~LinearMode()
 
 int LinearMode::getFiltEdge(const Direction dir, const int offset)
 {
-  const int *mainRefs = dir == LEFT_DIR ? leftRefs : topRefs;
-  const int *sideRefs = dir == LEFT_DIR ? topRefs : leftRefs;
-  int ref = mainRefs[0] + ((sideRefs[offset] - corner) >> 1);
+  const int *mainRefs = dir == INTRA_DIR_LEFT ? leftRefs : topRefs;
+  const int *sideRefs = dir == INTRA_DIR_LEFT ? topRefs : leftRefs;
+  int ref = mainRefs[0] + ((sideRefs[offset] - itsCornerReference) >> 1);
   return SeqParams::getInstance()->clip(pu->getImgComp(), ref);
 }
 
@@ -150,24 +150,24 @@ int **LinearMode::calcPred()
   assert(pu != nullptr);
   assert((leftRefs != nullptr) || (topRefs != nullptr));
 
-  Direction dir = pu->getModeIdx() == 10 ? LEFT_DIR : TOP_DIR;
+  Direction dir = pu->getModeIdx() == 10 ? INTRA_DIR_LEFT : INTRA_DIR_TOP;
   bool filtEdge = (pu->getImgComp() == LUMA) && (pu->getPuSize() < 32);
 
   int **pred = initPred();
 
-  pred[0][0] = dir == LEFT_DIR ? leftRefs[0] : topRefs[0];
+  pred[0][0] = dir == INTRA_DIR_LEFT ? leftRefs[0] : topRefs[0];
   if (filtEdge)
     pred[0][0] = getFiltEdge(dir, 0);
 
   for (int x = 1; x < pu->getPuSize(); x++)
-    pred[x][0] = dir == TOP_DIR ? topRefs[x] : filtEdge ? getFiltEdge(LEFT_DIR, x) : leftRefs[0];
+    pred[x][0] = dir == INTRA_DIR_TOP ? topRefs[x] : filtEdge ? getFiltEdge(INTRA_DIR_LEFT, x) : leftRefs[0];
 
   for (int y = 1; y < pu->getPuSize(); y++)
-    pred[0][y] = dir == LEFT_DIR ? leftRefs[y] : filtEdge ? getFiltEdge(TOP_DIR, y) : topRefs[0];
+    pred[0][y] = dir == INTRA_DIR_LEFT ? leftRefs[y] : filtEdge ? getFiltEdge(INTRA_DIR_TOP, y) : topRefs[0];
 
   for (int x = 1; x < pu->getPuSize(); x++)
     for (int y = 1; y < pu->getPuSize(); y++)
-      pred[x][y] = dir == LEFT_DIR ? leftRefs[y] : topRefs[x];
+      pred[x][y] = dir == INTRA_DIR_LEFT ? leftRefs[y] : topRefs[x];
 
   return pred;
 }
@@ -214,7 +214,7 @@ void AngMode::getRefsArray()
   refsArray = new int [2 * pu->getPuSize() + 1];
 
   int start = angle > 0 ? 0 : pu->getPuSize();
-  refsArray[start++] = corner;
+  refsArray[start++] = itsCornerReference;
   for (int x = start; x < 2 * pu->getPuSize() + 1; x++)
     refsArray[x] = modeHor ? leftRefs[x - start] : topRefs[x - start];
 

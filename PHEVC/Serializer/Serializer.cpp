@@ -67,11 +67,10 @@ Int main(Int argc, Char* argv[])
 	Int size = bok*bok;
 
 	string s;
-	char chars[120];
 
-	string macierze_base = "D:\\macierze4x4";
-	string transform_base = "D:\\tlog_qp25";
-	string quant_base = "D:\\qlog_qp25";
+	string macierze_base = "D:\\txt\\macierze4x4";
+	string transform_base = "D:\\txt\\tlog_qp25";
+	string quant_base = "D:\\txt\\qlog_qp25";
 
 	string macierze = macierze_base+".txt";
 	string transformLog = transform_base+".txt";

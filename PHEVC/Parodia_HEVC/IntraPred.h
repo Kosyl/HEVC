@@ -5,34 +5,36 @@
 #include <algorithm>
 
 #include "Utils.h"
-#include "Pu.h"
+#include "PU.h"
 #include "IntraMode.h"
 
 class IntraPred
 {
-  private:
-    static IntraPred *instance;
-    IntraMode **modes;
-    const Pb *pb;
-    int corner;
-    int *leftRefs, *topRefs;
-    IntraPred();
-    int getFiltThresh() const;
-    bool isFiltReq() const;
-    int filtRef(const int, const int, const int) const;
-    void filterSideRefs(const Direction);
-    void filter();
-    bool checkSmoothCond(const Direction) const;
-    bool isSmoothReq() const;
-    int smothRef(const Direction, const int) const;
-    void smoothSideRefs(const Direction);
-    void smooth();
-    IntraMode *getStrategy();
-  public:
-    ~IntraPred();
-    static IntraPred *getInstance();
-    int **calcPred(const Pb *);
-	int **calcPredForceRefs(const Pb *, int *leftRefs, int *topRefs, const int corner);
+private:
+	static IntraPred *itsInstance;
+	IntraMode **itsModes;
+	PBIntra* itsCurrentPB;
+	Sample itsCornerValue;
+	Sample** itsReferenceValues;
+
+	IntraPred( );
+
+	UShort getFilteringThreshold( ) const;
+	Bool isFilteringRequired( ) const;
+	Sample filtRef( const Sample mainRef, const Sample leftRef, const Sample rightRef ) const;
+	Void filterSideRefs( const IntraDirection referenceDirection );
+	Void doReferenceFiltering( );
+	Bool checkSmoothConditions( const IntraDirection direction ) const;
+	Bool isSmoothingRequired( ) const;
+	Sample getSmoothedReferenceAtPosition( const IntraDirection dir, const UShort offset ) const;
+	Void smoothSideRefs( const IntraDirection dir );
+	Void doReferenceSmoothing( );
+	IntraMode* getPredictionStrategy( );
+public:
+	~IntraPred( );
+	static IntraPred *getInstance( );
+	Sample** calcPred( PBIntra* targetPB );
+	Sample** calcPredForceRefs( PBIntra* tergetPB, Sample* leftRefs, Sample* topRefs, const Sample corner );
 };
 
 #endif

@@ -35,6 +35,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <algorithm>
 #include <list>
 #include <map>
 #include "program_options_lite.h"

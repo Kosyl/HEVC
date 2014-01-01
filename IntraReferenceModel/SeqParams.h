@@ -5,7 +5,7 @@
 #include <string>
 
 enum ImgComp {LUMA, CB, CR};
-enum Direction {LEFT_DIR = 0, TOP_DIR, CORNER_DIR};
+enum Direction {INTRA_DIR_LEFT = 0, INTRA_DIR_TOP, INTRA_DIR_CORNER};
 
 class SeqParams
 {
@@ -21,19 +21,19 @@ class SeqParams
     void setPicHeight(const int);
     void setBitDepthLuma(const int);
     void setBitDepthChroma(const int);
-    void setMaxCuSize(const int);
+    void setMaxCUSize(const int);
     void setSmoothEn(const bool);
     int getPicWidth() const;
     int getPicHeight() const;
     int getBitDepthLuma() const;
     int getBitDepthChroma() const;
-    int getMaxCuSize() const;
+    int getMaxCUSize() const;
     bool getSmoothEn() const;
     int clip(const ImgComp, const int) const;
     int getDefVal(const ImgComp) const;
 };
 
-int log2(const int);
+int log2Int(const int);
 ImgComp getImgComp(const std::string);
 
 #endif

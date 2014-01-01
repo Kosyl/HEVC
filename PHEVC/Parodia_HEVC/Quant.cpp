@@ -4,6 +4,7 @@
 
 #include "Quant.h"
 #include <assert.h>
+#include <algorithm>
 
 using namespace std;
 
@@ -47,7 +48,7 @@ Quant::~Quant()
  *	\param trSize rozmiar transformaty - tylko na potrzeby logowania, jesli np. transformata 4x4 w bloku 8x8 to funkcja moze zalogowac 4x4
  *	\return void  
  */
-void Quant::quant(Short** const inputCoeff, Short** result, const Int& QP, const Int& bitDepth, const Int& totalSize, const Int& trSize)
+void Quant::quant( Coeff** const inputCoeff, Coeff** result, const Int& QP, const Int& bitDepth, const Int& totalSize, const Int& trSize )
 {
 	Short log2TrSize;
 	switch(trSize)
@@ -77,7 +78,7 @@ void Quant::quant(Short** const inputCoeff, Short** result, const Int& QP, const
 		for(int j=0;j<totalSize;++j)
 		{
 			int sign = inputCoeff[i][j]<0?-1:1;
-			result[i][j]=((long long)abs(inputCoeff[i][j])*Q + offset)>>shift;
+			result[i][j]=(Short)(((long long)abs(inputCoeff[i][j])*Q + offset)>>shift);
 			result[i][j]*=sign;
 			result[i][j]=std::min<int> (std::max<int> (-32768, result[i][j]) , 32767);
 		}
@@ -111,7 +112,7 @@ void Quant::quant(Short** const inputCoeff, Short** result, const Int& QP, const
 	}
 }
 
-void Quant::quant(Short** const inputCoeff, Short** result, const Int& QP, const Int& bitDepth, const Int& trSize)
+void Quant::quant( Coeff** const inputCoeff, Coeff** result, const Int& QP, const Int& bitDepth, const Int& trSize )
 {
 	quant(inputCoeff,result,QP,bitDepth,trSize,trSize);
 }
@@ -125,7 +126,7 @@ void Quant::quant(Short** const inputCoeff, Short** result, const Int& QP, const
  *	\param trSize rozmiar transformaty - tylko na potrzeby logowania, jesli np. transformata 4x4 w bloku 8x8 to funkcja moze zalogowac 4x4
  *	\return void  
  */
-void Quant::deQuant(Short** const inputCoeff, Short** result, const Int& QP, const Int& bitDepth, const Int& totalSize, const Int& trSize)
+void Quant::deQuant( Coeff** const inputCoeff, Coeff** result, const Int& QP, const Int& bitDepth, const Int& totalSize, const Int& trSize )
 {
 	Short log2TrSize;
 	switch(trSize)
@@ -177,7 +178,7 @@ void Quant::deQuant(Short** const inputCoeff, Short** result, const Int& QP, con
 		}
 	}
 }
-void Quant::deQuant(Short** const inputCoeff, Short** result, const Int& QP, const Int& bitDepth, const Int& trSize)
+void Quant::deQuant( Coeff** const inputCoeff, Coeff** result, const Int& QP, const Int& bitDepth, const Int& trSize )
 {
 	deQuant(inputCoeff,result,QP,bitDepth,trSize,trSize);
 }

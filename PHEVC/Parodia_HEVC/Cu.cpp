@@ -1,84 +1,106 @@
-#include "Pu.h"
-#include "Cu.h"
-#include "Utils.h"
+#include "PU.h"
+#include "CU.h"
+#include "CTU.h"
+#include "TU.h"
 
-
-Cu::Cu(Frame *newFrame, const int newCuX, const int newCuY, const int newCuSize):
-	puList(), tuList()
+CU::CU( CTU* ctu, UShort x, UShort y, UShort size ) :
+CTUComponentBase( ctu != nullptr ? ctu->getPicture( ) : nullptr, ctu, x, y, size ),
+itsPartitionMode( PartitionMode::PART_NOTSET ),
+itsTransformTree( nullptr )
 {
-	setCuX(newCuX);
-	setCuY(newCuY);
-	setCuSize(newCuSize);
-	frame = newFrame;
+	itsTransformTree = std::make_shared<TUQuadTree>( this, itsX, itsY, size );
+	itsPredictions = new Sample**[ 3 ];
+	itsPredictions[ LUMA ] = getEmptyMatrix<Sample>( size, size );
+	itsPredictions[ CR ] = getEmptyMatrix<Sample>( size / 2, size / 2 );
+	itsPredictions[ CB ] = getEmptyMatrix<Sample>( size / 2, size / 2 );
 }
 
-Cu::~Cu()
+CU::~CU( )
 {
-	for (int i = 0; i < puList.size(); ++i)
-		delete puList[i];
-
-	puList.clear();
-
-	for (int i = 0; i < tuList.size(); ++i)
-		delete tuList[i];
-
-	tuList.clear();
+	if( itsPredictions != nullptr )
+	{
+		deleteMatrix( itsPredictions[ LUMA ], itsSize );
+		deleteMatrix( itsPredictions[ CR ], itsSize / 2 );
+		deleteMatrix( itsPredictions[ CB ], itsSize / 2 );
+		delete[] itsPredictions;
+		itsPredictions = nullptr;
+	}
 }
 
-void Cu::setCuX(const int newCuX)
+Void CU::printDescription( )
 {
-	assert(newCuX >= 0);
-	cuX = newCuX;
+	LOG( "PART" ) << "CU[" << getX( ) << "][" << getY( ) << "], size: " << getSize( ) << std::endl;
 }
 
-void Cu::setQP(const int newQP)
+CUIntra::CUIntra( CTU* ctu, UShort x, UShort y, UShort size ) :
+CU( ctu, x, y, size ),
+itsChromaPredictionDerivationType( 0 )
 {
-	assert(newQP >= 0);
-	QP = newQP;
+	for( UInt i = QTCOMPONENT_FIRST; i <= QTCOMPONENT_LAST; ++i )
+	{
+		itsPUs[ i ] = nullptr;
+	}
+	itsIntraMPMs[ 0 ] = itsIntraMPMs[ 1 ] = itsIntraMPMs[ 2 ] = 0;
 }
 
-void Cu::setCuY(const int newCuY)
+CUIntra::~CUIntra( )
 {
-	assert(newCuY >= 0);
-	cuY = newCuY;
 }
 
-void Cu::setCuSize(const int newCuSize)
+Void CUIntra::printDescription(  )
 {
-	assert( ( newCuSize == 8 || newCuSize == 16 || newCuSize == 32 || newCuSize == 64 ) && (SeqParams::getInstance())->getMaxCuSize() >= newCuSize );
-	cuY = newCuSize;
+	LOG( "PART" ) << "CUIntra[" << getX( ) << "][" << getY( ) << "], size: " << getSize( ) << ", chromaModeDerivation: " << itsChromaPredictionDerivationType << "; partMode: " << ( itsPartitionMode == PART_NxN ? "NxN" : "2Nx2N" ) << std::endl;
+	printMatrix( itsParentPicture->samples( LUMA ), itsSize, itsSize, LOG( "PART" ), itsX, itsY, "" );
+
+	LOG( "PART" )  << "PUs:" << std::endl;
+
+	LOG_TAB( );
+
+	for( QTComponent position = QTCOMPONENT_FIRST; position <= QTCOMPONENT_LAST; ++position )
+	{
+		if( itsPUs[ position ] != nullptr ) itsPUs[ position ]->printDescription( );
+	}
+
+	LOG_UNTAB( );
 }
 
-void Cu::addPu(Pu& newPu)
+Void CUIntra::reconstructionLoop( )
 {
-	//TODO sprawdzanie poprawnosci nowego warunku
-	//std::vector<Pu*>::iterator iter = puList.begin();
-	//while(iter != puList.end())
-	//{
+	LOG( "RECO" ) << "CUIntra[" << getX( ) << "][" << getY( ) << "], size: " << getSize( ) << ", chromaModeDerivation: " << itsChromaPredictionDerivationType << "; partMode: " << ( itsPartitionMode == PART_NxN ? "NxN" : "2Nx2N" ) << std::endl;
+	LOG_TAB( "RECO" );
 
-	//	assert((*iter)->getPuX() != newPu.getPuX() || (*iter)->getPuY() != newPu.getPuY());//nie jest w tym samym miejscu
-	//	assert(newPu.getPuSize() < newPu.getPuX()-cuX
-	//}
-	newPu.setPicRecon(frame);
-	puList.push_back(&newPu);
+	if( itsPartitionMode == PART_2Nx2N )
+	{
+		itsPUs[ 0 ]->reconstructionLoop( );
+	}
+	else
+	{
+		for( QTComponent position = QTCOMPONENT_FIRST; position <= QTCOMPONENT_LAST; ++position )
+		{
+			itsPUs[ position ]->reconstructionLoop( );
+		}
+	}
+
+	LOG_UNTAB("RECO" );
 }
 
-int Cu::getCuX() const
+Void CUIntra::createPUs( UInt lumaModeIdx )
 {
-	return cuX;
-}
-
-int Cu::getCuY() const
-{
-	return cuY;
-}
-
-int Cu::getCuSize() const
-{
-	return cuSize;
-}
-
-int Cu::getQP() const
-{
-	return QP;
+	if( itsPartitionMode == PART_NxN )
+	{
+		for( UInt i = QTCOMPONENT_FIRST; i <= QTCOMPONENT_LAST; ++i )
+		{
+			UInt x = itsX + ( itsSize / 2 ) * ( i % 2 );
+			UInt y = itsY + ( itsSize / 2 ) * ( i / 2 );
+			std::shared_ptr<PUIntra> pu = std::make_shared<PUIntra>( this, x, y, itsSize / 2 );
+			pu->setLumaModeIdx( lumaModeIdx );
+			addPU( pu, (QTComponent)i );
+		}
+	}
+	else // PART_2Nx2N
+	{
+		std::shared_ptr<PUIntra> pu = std::make_shared<PUIntra>( this, itsX, itsY, itsSize );
+		pu->setLumaModeIdx( lumaModeIdx );
+		addPU( pu );
+	}
 }

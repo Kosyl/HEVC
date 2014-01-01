@@ -197,7 +197,7 @@ void CuReconReader::initSamples()
   samples = new int** [3];
   for (int comp = 0; comp < 3; comp++)
   {
-    int cuSize = seqParams->getMaxCuSize()/(comp == LUMA ? 1 : 2);
+    int cuSize = seqParams->getMaxCUSize()/(comp == LUMA ? 1 : 2);
     samples[comp] = new int* [cuSize];
     for (int x = 0; x < cuSize; x++)
       samples[comp][x] = new int [cuSize];
@@ -209,7 +209,7 @@ void CuReconReader::clearSamples()
   SeqParams *seqParams = SeqParams::getInstance();
   for (int comp = 0; comp < 3; comp++)
   {
-    int cuSize = seqParams->getMaxCuSize()/(comp == LUMA ? 1 : 2);
+    int cuSize = seqParams->getMaxCUSize()/(comp == LUMA ? 1 : 2);
     for (int x = 0; x < cuSize; x++)
       delete [] samples[comp][x];
     delete [] samples[comp];
@@ -237,7 +237,7 @@ void CuReconReader::printSamples()
   for (int comp = 0; comp < 3; comp++)
   {
     std::cout << (comp == 0 ? "Luma:" : comp == 1 ? "Cb" : "Cr") << std::endl;
-    int cuSize = seqParams->getMaxCuSize()/(comp == LUMA ? 1 : 2);
+    int cuSize = seqParams->getMaxCUSize()/(comp == LUMA ? 1 : 2);
     for (int y = 0; y < cuSize; y++)
     {
       for (int x = 0; x < cuSize; x++)
@@ -317,7 +317,7 @@ void PicRecon::readSeqParams()
         else if (lineIdx == 4)
         {
           sourceFile >> line >> line >> value;
-          seqParams->setMaxCuSize(value);
+          seqParams->setMaxCUSize(value);
         }
         else if (lineIdx == 5)
         {

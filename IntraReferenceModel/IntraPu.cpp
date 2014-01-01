@@ -40,7 +40,7 @@ bool IntraPu::calcPuAvail(const int puX, const int puY) const
 
 	int picWidth = seqParams->getPicWidth()/(comp == LUMA ? 1 : 2);
 	int picHeight = seqParams->getPicHeight()/(comp == LUMA ? 1 : 2);
-	int maxCuSize = seqParams->getMaxCuSize()/(comp == LUMA ? 1 : 2);
+	int maxCuSize = seqParams->getMaxCUSize()/(comp == LUMA ? 1 : 2);
 	int cuX = cu->getCuX()/(comp == LUMA ? 1 : 2);
 	int cuY = cu->getCuY()/(comp == LUMA ? 1 : 2);
 
@@ -61,9 +61,9 @@ bool IntraPu::calcPuAvail(const int puX, const int puY) const
 int IntraPu::getReconRef(const Direction dir, const int offset) const
 {
 	int puX = getPuX(), puY = getPuY();
-	if (dir == LEFT_DIR)
+	if (dir == INTRA_DIR_LEFT)
 		return picRecon[puX - 1][puY + offset];
-	else if (dir == CORNER_DIR)
+	else if (dir == INTRA_DIR_CORNER)
 		return picRecon[puX - 1][puY - 1];
 	else
 		return picRecon[puX + offset][puY - 1];
@@ -73,13 +73,13 @@ int IntraPu::getRefSubs(const Direction dir) const
 {
 	int puX = getPuX(), puY = getPuY();
 
-	Direction oppDir = dir == LEFT_DIR ? TOP_DIR : LEFT_DIR;
-	int oppPuX = oppDir == LEFT_DIR ? puX - 1 : puX;
-	int oppPuY = oppDir == TOP_DIR ? puY - 1 : puY;
+	Direction oppDir = dir == INTRA_DIR_LEFT ? INTRA_DIR_TOP : INTRA_DIR_LEFT;
+	int oppPuX = oppDir == INTRA_DIR_LEFT ? puX - 1 : puX;
+	int oppPuY = oppDir == INTRA_DIR_TOP ? puY - 1 : puY;
 
 	int refSubs = SeqParams::getInstance()->getDefVal(comp);
 	if (calcPuAvail(puX - 1, puY - 1))
-		refSubs = getReconRef(CORNER_DIR);
+		refSubs = getReconRef(INTRA_DIR_CORNER);
 	else if (calcPuAvail(oppPuX, oppPuY))
 		refSubs = getReconRef(oppDir);
 	return refSubs;
@@ -161,31 +161,31 @@ int IntraPu::getCorner() const
 	int puX = getPuX(), puY = getPuY();
 	int cornerRef = SeqParams::getInstance()->getDefVal(comp);
 	if (calcPuAvail(puX - 1, puY - 1))
-		cornerRef = getReconRef(CORNER_DIR);
+		cornerRef = getReconRef(INTRA_DIR_CORNER);
 	else if (calcPuAvail(puX - 1, puY))
-		cornerRef = getReconRef(LEFT_DIR);
+		cornerRef = getReconRef(INTRA_DIR_LEFT);
 	else if (calcPuAvail(puX, puY - 1))
-		cornerRef = getReconRef(TOP_DIR);
+		cornerRef = getReconRef(INTRA_DIR_TOP);
 	return cornerRef;
 }
 
 int* IntraPu::getSideRefs(const Direction dir) const
 {
-	assert(dir != CORNER_DIR);
+	assert(dir != INTRA_DIR_CORNER);
 
 	int *refs = new int [2 * puSize];
 	int puX = getPuX(), puY = getPuY();
 
-	int nghPuX = dir == LEFT_DIR ? puX - 1 : puX;
-	int nghPuY = dir == TOP_DIR ? puY - 1 : puY;
+	int nghPuX = dir == INTRA_DIR_LEFT ? puX - 1 : puX;
+	int nghPuY = dir == INTRA_DIR_TOP ? puY - 1 : puY;
 	bool neighborAvail = calcPuAvail(nghPuX, nghPuY);
 
 	int refSubs = getRefSubs(dir);
 	for (int x = 0; x < puSize; x++)
 		refs[x] = neighborAvail ? getReconRef(dir, x) : refSubs;
 
-	nghPuX = dir == LEFT_DIR ? puX - 1 : puX + puSize;
-	nghPuY = dir == TOP_DIR ? puY - 1 : puY + puSize;
+	nghPuX = dir == INTRA_DIR_LEFT ? puX - 1 : puX + puSize;
+	nghPuY = dir == INTRA_DIR_TOP ? puY - 1 : puY + puSize;
 	neighborAvail = calcPuAvail(nghPuX, nghPuY);
 
 	refSubs = refs[puSize - 1];

@@ -1,31 +1,31 @@
 #include "IntraPred.h"
 
-IntraPred* IntraPred::instance = nullptr;
+IntraPred* IntraPred::itsInstance = nullptr;
 
 IntraPred::IntraPred()
 {
-  modes = new IntraMode *[4];
-  modes[PLANAR] = new PlanarMode();
-  modes[DC] = new DcMode();
-  modes[LINEAR] = new LinearMode();
-  modes[ANGULAR] = new AngMode();
+  itsModes = new IntraMode *[4];
+  itsModes[PLANAR] = new PlanarMode();
+  itsModes[DC] = new DcMode();
+  itsModes[LINEAR] = new LinearMode();
+  itsModes[ANGULAR] = new AngMode();
 }
 
 IntraPred::~IntraPred()
 {
   for (int i = 0; i < 4; i++)
-    delete modes[i];
-  delete [] modes;
+    delete itsModes[i];
+  delete [] itsModes;
 }
 
 IntraPred* IntraPred::getInstance()
 {
-  if (instance == nullptr)
-    instance = new IntraPred();
-  return instance;
+  if (itsInstance == nullptr)
+    itsInstance = new IntraPred();
+  return itsInstance;
 }
 
-int IntraPred::getFiltThresh() const
+int IntraPred::getFilteringThreshold() const
 {
   int thresh = 10;
   switch (pu->getPuSize())
@@ -43,11 +43,11 @@ int IntraPred::getFiltThresh() const
   return thresh;
 }
 
-bool IntraPred::isFiltReq() const
+bool IntraPred::isFilteringRequired() const
 {
   bool skipFiltration = (pu->getImgComp() != LUMA) || (pu->getModeIdx() == 1);
   int dist = std::min(abs(pu->getModeIdx() - 10), abs(pu->getModeIdx() - 26));
-  bool distTooSmall = dist <= getFiltThresh();
+  bool distTooSmall = dist <= getFilteringThreshold();
   if (skipFiltration | distTooSmall)
     return false;
   return true;
@@ -60,9 +60,9 @@ int IntraPred::filtRef(const int mainRef, const int leftRef, const int rightRef)
 
 void IntraPred::filterSideRefs(const Direction dir)
 {
-  int *refs = dir == LEFT_DIR ? leftRefs : topRefs;
+  int *refs = dir == INTRA_DIR_LEFT ? itsLeftRefs : itsTopRefs;
 
-  int prevRef = corner, currRef;
+  int prevRef = itsCornerValue, currRef;
   for (int x = 0; x < 2 * pu->getPuSize() - 1; x++, prevRef = currRef)
   {
     currRef = refs[x];
@@ -72,22 +72,22 @@ void IntraPred::filterSideRefs(const Direction dir)
 
 void IntraPred::filter()
 {
-  assert((leftRefs != nullptr) && (topRefs != nullptr));
+  assert((itsLeftRefs != nullptr) && (itsTopRefs != nullptr));
 
-  int firstLeft = leftRefs[0];
-  int firstTop = topRefs[0];
+  int firstLeft = itsLeftRefs[0];
+  int firstTop = itsTopRefs[0];
 
-  filterSideRefs(LEFT_DIR);
-  filterSideRefs(TOP_DIR);
+  filterSideRefs(INTRA_DIR_LEFT);
+  filterSideRefs(INTRA_DIR_TOP);
 
-  corner = filtRef(corner, firstLeft, firstTop);
+  itsCornerValue = filtRef(itsCornerValue, firstLeft, firstTop);
 }
 
 bool IntraPred::checkSmoothCond(const Direction dir) const
 {
-  assert(dir != CORNER_DIR);
-  const int *currRefs = dir == LEFT_DIR ? leftRefs : topRefs;
-  int cond = abs(corner + currRefs[2 * pu->getPuSize() - 1] - 2 * currRefs[pu->getPuSize() - 1]);
+  assert(dir != INTRA_DIR_CORNER);
+  const int *currRefs = dir == INTRA_DIR_LEFT ? itsLeftRefs : itsTopRefs;
+  int cond = abs(itsCornerValue + currRefs[2 * pu->getPuSize() - 1] - 2 * currRefs[pu->getPuSize() - 1]);
   int limit = 1 << (SeqParams::getInstance()->getBitDepthLuma() - 5);
   return cond < limit;
 } 
@@ -96,42 +96,42 @@ bool IntraPred::isSmoothReq() const
 {
   bool skipFiltration = (pu->getImgComp() != LUMA) || (pu->getModeIdx() == 1);
   bool skipSmoothing = (pu->getPuSize() != 32) || !SeqParams::getInstance()->getSmoothEn();
-  bool smoothCond = checkSmoothCond(LEFT_DIR) && checkSmoothCond(TOP_DIR);
+  bool smoothCond = checkSmoothCond(INTRA_DIR_LEFT) && checkSmoothCond(INTRA_DIR_TOP);
   return !(skipFiltration || skipSmoothing) && smoothCond;
 }
 
-int IntraPred::smothRef(const Direction dir, const int offset) const
+int IntraPred::getSmoothedReferenceAtPosition(const Direction dir, const int offset) const
 {
-  int lastRef = dir == LEFT_DIR ? leftRefs[2 * pu->getPuSize() - 1] : topRefs[2 * pu->getPuSize() - 1];
-  return ((63 - offset) * corner + (offset + 1) * lastRef + 32) >> 6;
+  int lastRef = dir == INTRA_DIR_LEFT ? itsLeftRefs[2 * pu->getPuSize() - 1] : itsTopRefs[2 * pu->getPuSize() - 1];
+  return ((63 - offset) * itsCornerValue + (offset + 1) * lastRef + 32) >> 6;
 }
 
 void IntraPred::smoothSideRefs(const Direction dir)
 {
-  int *refs = dir == LEFT_DIR ? leftRefs : topRefs;
+  int *refs = dir == INTRA_DIR_LEFT ? itsLeftRefs : itsTopRefs;
   for (int x = 0; x < 2 * pu->getPuSize(); x++)
-    refs[x] = smothRef(dir, x);
+    refs[x] = getSmoothedReferenceAtPosition(dir, x);
 }
 
-void IntraPred::smooth()
+void IntraPred::doReferenceSmoothing()
 {
-  smoothSideRefs(LEFT_DIR);
-  smoothSideRefs(TOP_DIR);
+  smoothSideRefs(INTRA_DIR_LEFT);
+  smoothSideRefs(INTRA_DIR_TOP);
 }
 
-IntraMode *IntraPred::getStrategy()
+IntraMode *IntraPred::getPredictionStrategy()
 {
   switch (pu->getModeIdx())
   {
     case 0:
-      return modes[PLANAR];
+      return itsModes[PLANAR];
     case 1:
-      return modes[DC];
+      return itsModes[DC];
     case 10:
     case 26:
-      return modes[LINEAR];
+      return itsModes[LINEAR];
     default:
-      return modes[ANGULAR];
+      return itsModes[ANGULAR];
   }
 }
 
@@ -141,28 +141,28 @@ int **IntraPred::calcPred(const IntraPu *newPu)
 
   pu = newPu;
 
-  corner = pu->getCorner();
-  leftRefs = pu->getSideRefs(LEFT_DIR);
-  topRefs = pu->getSideRefs(TOP_DIR);
+  itsCornerValue = pu->getCorner();
+  itsLeftRefs = pu->getSideRefs(INTRA_DIR_LEFT);
+  itsTopRefs = pu->getSideRefs(INTRA_DIR_TOP);
 
-  if (isFiltReq())
+  if (isFilteringRequired())
   {
     if (isSmoothReq())
-      smooth();
+      doReferenceSmoothing();
     else 
       filter();
   }
 
-  IntraMode *strategy = getStrategy();
+  IntraMode *strategy = getPredictionStrategy();
   strategy->setPu(pu);
-  strategy->setCorner(corner);
-  strategy->setSideRefs(LEFT_DIR, leftRefs);
-  strategy->setSideRefs(TOP_DIR, topRefs);
+  strategy->setCorner(itsCornerValue);
+  strategy->setSideRefs(INTRA_DIR_LEFT, itsLeftRefs);
+  strategy->setSideRefs(INTRA_DIR_TOP, itsTopRefs);
 
   int **pred = strategy->calcPred();
 
-  delete [] leftRefs;
-  delete [] topRefs;
+  delete [] itsLeftRefs;
+  delete [] itsTopRefs;
 
   return pred;
 }
@@ -173,19 +173,19 @@ int **IntraPred::calcPredForceRefs(const IntraPu *newPu, const int *leftRefs, co
 
   pu = newPu;
 
-  if (isFiltReq())
+  if (isFilteringRequired())
   {
     if (isSmoothReq())
-      smooth();
+      doReferenceSmoothing();
     else 
       filter();
   }
 
-  IntraMode *strategy = getStrategy();
+  IntraMode *strategy = getPredictionStrategy();
   strategy->setPu(pu);
   strategy->setCorner(corner);
-  strategy->setSideRefs(LEFT_DIR, leftRefs);
-  strategy->setSideRefs(TOP_DIR, topRefs);
+  strategy->setSideRefs(INTRA_DIR_LEFT, leftRefs);
+  strategy->setSideRefs(INTRA_DIR_TOP, topRefs);
 
   int **pred = strategy->calcPred();
 

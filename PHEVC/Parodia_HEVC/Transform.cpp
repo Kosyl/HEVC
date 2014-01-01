@@ -54,7 +54,7 @@ Transform::~Transform()
 *	\param isIntra4x4LumaDST_ver czy uzywa DST w pionie (2ga faza)
 *	\return void  
 */
-void Transform::forwardTrans(Short** const block, Short** coeff, const Int& trSize, const Int& bitDepth, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver)
+void Transform::forwardTrans(Sample** const block, Coeff** coeff, const Int& trSize, const Int& bitDepth, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver)
 {
 	Int i,j,k,iSum;
 
@@ -203,7 +203,7 @@ void Transform::forwardTrans(Short** const block, Short** coeff, const Int& trSi
 *	\param isIntra4x4LumaDST_ver czy uzywa DST w pionie (2ga faza)
 *	\return void  
 */
-void Transform::forwardTrans(Short** const block, Short** coeff, const Int& totalSize, const Int& trSize, const Int& bitDepth, const Int& offset_hor, const Int& offset_ver, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver)
+void Transform::forwardTrans(Sample** const block, Coeff** coeff, const Int& totalSize, const Int& trSize, const Int& bitDepth, const Int& offset_hor, const Int& offset_ver, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver)
 {
 	Int i,j,k,iSum;
 
@@ -360,7 +360,7 @@ void Transform::forwardTrans(Short** const block, Short** coeff, const Int& tota
 *	\param isIntra4x4LumaDST_ver czy uzywa DST w pionie (2ga faza)
 *	\return void
 */
-void Transform::inverseTrans(Short** const coeff, Short** block, const Int& trSize, const Int& bitDepth, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver)
+void Transform::inverseTrans(Coeff** const coeff, Sample** block, const Int& trSize, const Int& bitDepth, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver)
 {
 	Int i,j,k;
 	Int iSum;
@@ -504,7 +504,7 @@ void Transform::inverseTrans(Short** const coeff, Short** block, const Int& trSi
 *	\param isIntra4x4LumaDST_ver czy uzywa DST w pionie (2ga faza)
 *	\return void  
 */
-void Transform::inverseTrans(Short** const coeff, Short** block, const Int& totalSize, const Int& trSize, const Int& bitDepth, const Int& offset_hor, const Int& offset_ver, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver)
+void Transform::inverseTrans(Coeff** const coeff, Sample** block, const Int& totalSize, const Int& trSize, const Int& bitDepth, const Int& offset_hor, const Int& offset_ver, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver)
 {
 	Int i,j,k;
 	Int iSum;

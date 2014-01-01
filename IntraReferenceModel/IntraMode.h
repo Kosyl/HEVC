@@ -9,7 +9,7 @@ class IntraMode
 {
   protected:
     const IntraPu *pu;
-    int corner;
+    int itsCornerReference;
     const int *leftRefs, *topRefs;
     int **initPred() const;
   public:

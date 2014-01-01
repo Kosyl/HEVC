@@ -39,7 +39,7 @@ void SeqParams::setBitDepthChroma(const int newBitDepthChroma)
   bitDepthChroma = newBitDepthChroma;
 }
 
-void SeqParams::setMaxCuSize(const int newMaxCuSize)
+void SeqParams::setMaxCUSize(const int newMaxCuSize)
 {
   maxCuSize = newMaxCuSize;
 }
@@ -70,7 +70,7 @@ int SeqParams::getBitDepthChroma() const
   return bitDepthChroma;
 }
 
-int SeqParams::getMaxCuSize() const
+int SeqParams::getMaxCUSize() const
 {
   return maxCuSize;
 }
@@ -100,7 +100,7 @@ int SeqParams::getDefVal(ImgComp comp) const
 }
 
 
-int log2(const int value)
+int log2Int(const int value)
 {
   assert(value > 0);
 

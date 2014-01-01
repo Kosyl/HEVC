@@ -32,6 +32,9 @@ public:
 	static void setTabsLength(int len);
 	static void increaseTabsLength(int len);
 	static void decreaseTabsLength(int len);
+
+	int totalBinCount;
+	int partialBinCount;
 };
 
 #endif

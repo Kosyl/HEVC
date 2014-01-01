@@ -4,35 +4,103 @@
 #include <cassert>
 #include <vector>
 #include "Utils.h"
-#include "Frame.h"
+#include "Picture.h"
+#include "UnitBase.h"
 
-class Pu;
-class Tu;
+class PUIntra;
+class TUQuadTree;
 
-class Cu
+class CU : public CTUComponentBase
+{
+protected:
+	Sample*** itsPredictions;
+	Short itsQPDeltaForCU;
+	Bool itsTransQuantBypassEnabled; // skalowanie, transformata i filtr deblok.
+
+	PartitionMode itsPartitionMode;
+	std::shared_ptr<TUQuadTree> itsTransformTree;
+	
+public:
+	CU( CTU* ctu, UShort x, UShort y, UShort size );
+	virtual ~CU( );
+
+#pragma region Akcesory
+
+	std::shared_ptr<TUQuadTree> getTransformTree( ) const
+	{
+		return itsTransformTree;
+	}
+	Void setTransformTree( std::shared_ptr<TUQuadTree> val )
+	{
+		itsTransformTree = val;
+	}
+	PartitionMode getPartitionMode( ) const
+	{
+		return itsPartitionMode;
+	}
+	virtual Void setPartitionMode( PartitionMode val )
+	{
+		itsPartitionMode = val;
+	}
+	Sample** getPredictionMatrix( ImgComp comp )
+	{
+		return itsPredictions[ comp ];
+	}
+
+#pragma endregion
+
+	virtual Void printDescription( );
+	virtual Void reconstructionLoop( ) = 0;
+};
+
+class CUIntra : public CU
 {
 private:
-	Frame* frame;
-	int cuX, cuY;
-	int cuSize;
-	int QP;
-	std::vector<Pu*> puList;
-	std::vector<Tu*> tuList;
+
+	UShort itsIntraMPMs[ 3 ];
+	std::shared_ptr<PUIntra> itsPUs[ 4 ];
+	
+	UShort itsChromaPredictionDerivationType;
+	
 public:
-	Cu(Frame* frame, const int X = 0, const int Y = 0, const int size = 4);
-	~Cu();
+	CUIntra( CTU* ctu, UShort x, UShort y, UShort size );
+	virtual ~CUIntra( );
 
-	void setCuX(const int X);
-	void setCuY(const int Y);
-	void setCuSize(const int size);
-	void setQP(const int QP);
+#pragma region Akcesory
 
-	void addPu(Pu &);
+	UShort getIntraPredictionDerivationType( ) const
+	{
+		return itsChromaPredictionDerivationType;
+	}
+	void setIntraPredictionDerivationType( UShort val )
+	{
+		itsChromaPredictionDerivationType = val;
+	}
+	virtual Void setPartitionMode( PartitionMode val )
+	{
+		assert( val == PART_2Nx2N || val == PART_NxN );
+		itsPartitionMode = val;
+		for( UInt i = QTCOMPONENT_FIRST; i <= QTCOMPONENT_LAST; ++i )
+		{
+			if( itsPUs[ i ] != nullptr )
+				itsPUs[ i ].reset( );
+		}
+	}
+	Void addPU( std::shared_ptr<PUIntra> newPU, QTComponent position = QTCOMPONENT_FIRST )
+	{
+		itsPUs[ position ] = newPU;
+	}
 
-	int getCuX() const;
-	int getCuY() const;
-	int getCuSize() const;
-	int getQP() const;
+	std::shared_ptr<PUIntra> getPU( QTComponent position = QTCOMPONENT_FIRST )
+	{
+		return itsPUs[ position ];
+	}
+
+#pragma endregion
+
+	Void createPUs( UInt lumaModeIdx );
+	virtual Void printDescription( );
+	virtual Void reconstructionLoop( );
 };
 
 #endif

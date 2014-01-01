@@ -22,15 +22,15 @@ public:
 	TrQuantLoop(string path, bool isLogging, Transform* tr, Quant* q);
 	~TrQuantLoop();
 
-	void TrQuantDequantItr(Short** const block, Short** residuals, Short** result, const Int& QP, const Int& bitDepth, const Int& blockSize, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver);
+	void TrQuantDequantItr( Sample** const block, Sample** residuals, Sample** result, const Int& QP, const Int& bitDepth, const Int& blockSize, const Bool& isIntra4x4LumaDST_hor, const Bool& isIntra4x4LumaDST_ver );
 
-	Short** delta;
-	Short** horTrans;
-	Short** vertTrans;
-	Short** quant;
-	Short** dequant;
-	Short** invVertTrans;
-	Short** invHorTrans;
+	Sample** delta;
+	Coeff** horTrans;
+	Coeff** vertTrans;
+	Coeff** quant;
+	Coeff** dequant;
+	Coeff** invVertTrans;
+	Sample** invHorTrans;
 
 	Logger log;
 

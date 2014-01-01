@@ -1,274 +1,288 @@
-#include "Pu.h"
+#include "PU.h"
 #include "IntraPred.h"
+#include "QuadTree.h"
+#include "TU.h"
 
-Pu::Pu(Cu *newCu, const int X, const int Y)
+PUIntra::PUIntra( CUIntra *newCU, UInt X, UInt Y, UInt size ) :
+CTUComponentBase( newCU != nullptr ? newCU->getPicture( ) : nullptr, newCU != nullptr ? newCU->getParentCTU( ) : nullptr, X, Y, size ),
+itsParentCU( newCU )
 {
-	assert( X >= 0 && Y >= 0);
-	setCu(newCu);
-	puX=X;
-	puY=Y;
-	puIdx = calcPuIdx(X,Y);
-	blocks = new Pb*[3];
-	blocks[0] = new Pb(this, LUMA);
-	blocks[1] = new Pb(this, CB);
-	blocks[2] = new Pb(this, CR);
 }
 
-Pu::~Pu()
+PUIntra::~PUIntra( )
 {
-	if(blocks != nullptr)
+}
+
+Void PUIntra::printDescription( )
+{
+	LOG( "PART" ) << "PUIntra[" << getX( ) << "][" << getY( ) << "], size: " << getSize( ) << ", lumaPredMode: " << itsLumaModeIdx << std::endl;
+
+	LOG( "PART" ) << "zawarte TU:" << std::endl;
+	LOG_TAB( "PART" );
+	itsTransformArea->printDescription( );
+	LOG_UNTAB( "PART" );
+}
+
+UInt PUIntra::getModeForChroma( UInt modeForLuma, UInt chromaPredictionDerivationMode )
+{
+	switch( chromaPredictionDerivationMode )
 	{
-		for(int i=0;i<3;++i)
-			delete blocks[i];
-		delete[] blocks;
-		blocks=nullptr;
+	case 0:
+		return modeForLuma == 0 ? 34 : 0;
+	case 1:
+		return modeForLuma == 26 ? 34 : 26;
+	case 2:
+		return modeForLuma == 10 ? 34 : 10;
+	case 3:
+		return modeForLuma == 1 ? 34 : 1;
+	case 4:
+		return modeForLuma;
+	default:
+		assert( false );
+		return 0;
 	}
 }
 
-int Pu::calcPuIdx(const int puX, const int puY) const
+Void PUIntra::reconstructionLoop( )
 {
-	int puXDivBy4 = puX >> 2;
-	int puYDivBy4 = puY >> 2;
-	int calcPuIdx = ((puXDivBy4 & 8) << 3) | ((puXDivBy4 & 4) << 2) | ((puXDivBy4 & 2) << 1) | (puXDivBy4 & 1);
-	calcPuIdx |= ((puYDivBy4 & 8) << 4) | ((puYDivBy4 & 4) << 3) | ((puYDivBy4 & 2) << 2) | ((puYDivBy4 & 1) << 1);
-	return calcPuIdx;
+	LOG( "RECO" ) << "PUIntra[" << getX( ) << "][" << getY( ) << "], size: " << getSize( ) << ", lumaPredMode: " << itsLumaModeIdx << std::endl;
+	LOG_TAB("RECO" );
+	itsTransformArea->reconstructionLoop( this );
+	LOG_UNTAB("RECO" );
 }
-
-void Pu::setCu(Cu *newCu)
-{
-	assert(newCu != nullptr);
-	cu = newCu;
-}
-
-void Pu::setPuIdx(const int newPuIdx)
-{
-	assert(newPuIdx >= 0);
-	puIdx = newPuIdx;
-}
-
-void Pu::setPuSize(const int newPuSize)
-{
-	assert((newPuSize >= 4) && (newPuSize <= 32));
-	puSize = newPuSize;
-}
-
-void Pu::setModeIdx(const int newModeIdx)
-{
-	assert((newModeIdx >= 0) && (newModeIdx <= 34));
-	modeIdx = newModeIdx;
-}
-
-void Pu::setPicRecon(Frame* frame)
-{
-	assert(frame != nullptr);
-	int puX = getPuX(), puY = getPuY();
-	blocks[LUMA]->setPicRecon(frame->reconMatrix(LUMA));
-	blocks[CR]->setPicRecon(frame->reconMatrix(CR));
-	blocks[CB]->setPicRecon(frame->reconMatrix(CB));
-}
-
-Cu* Pu::getCu() const
-{
-	return cu;
-}
-
-int Pu::getPuIdx() const
-{
-	assert(puIdx >= 0);
-	return puIdx;
-}
-
-int Pu::getPuSize() const
-{
-	assert((puSize >= 4) && (puSize <= 32));
-	return puSize;
-}
-
-int Pu::getModeIdx() const
-{
-	assert((modeIdx >= 0) && (modeIdx <= 34));
-	return modeIdx;
-}
-
-int Pu::getPuX() const
-{
-	return puX;
-}
-
-int Pu::getPuY() const
-{
-	return puY;
-}
-
-int** Pu::getPred(ImgComp comp)
-{
-	return blocks[comp]->getPred();
-}
-
 ////////////////////////////////////////////
 
-Pb::Pb(const Pu* newPu, ImgComp newComp)
+PBIntra::PBIntra( TB* parentTB, ImgComp comp, UInt x, UInt y, UInt size ) :
+UnitBase( parentTB != nullptr ? parentTB->getPicture( ) : nullptr, x, y, size ),
+itsComp( comp ),
+itsParentTB( parentTB ),
+itsCornerReference( 0 ),
+itsReferencesReady( false ),
+itsPredictionTarget( nullptr )
 {
-	setPu(newPu);
-	comp = newComp;
+	assert( parentTB != nullptr );
+	itsPicRecon = itsParentPicture->reconMatrix( itsComp );
+	assert( itsPicRecon != nullptr );
+	itsSideReferences = getEmptyMatrix<Sample>( 2, 2 * itsSize );
+	//itsPredictionTarget = itsParentTB->getCu( )->getPredictionMatrix( itsComp );
 }
 
-Pb::~Pb()
+
+PBIntra::~PBIntra( )
 {
 }
 
-void Pb::setPu(const Pu* newPu)
+ImgComp PBIntra::getImgComp( )  const
 {
-	assert(newPu != nullptr);
-	pu = newPu;
+	return itsComp;
 }
 
-void Pb::setPicRecon(int const* const* matrix)
+UInt PBIntra::getPUIdx( ) const
 {
-	assert(matrix != nullptr);
-	picRecon = matrix;
+	return itsParentTB->getIdx( );
 }
 
-ImgComp Pb::getImgComp()  const
+UInt PBIntra::getModeIdx( ) const
 {
-	return comp;
+	return itsModeIdx;
 }
 
-int Pb::getPuIdx() const
+Void PBIntra::setModeIdx( UInt mode )
 {
-	return pu->getPuIdx();
+	itsModeIdx = mode;
 }
 
-int Pb::getPuSize() const
+Sample PBIntra::getCornerReference( )
 {
-	return pu->getPuSize()/(comp==LUMA ? 1 : 2);
+	if( !itsReferencesReady )
+		calcReferences( );
+
+	return itsCornerReference;
 }
 
-int Pb::getModeIdx() const
+Sample* PBIntra::getSideRefs( const IntraDirection dir )
 {
-	return pu->getModeIdx();
+	assert( dir != INTRA_DIR_CORNER );
+
+	if( !itsReferencesReady )
+		calcReferences( );
+
+	return itsSideReferences[ dir ];
 }
 
-int Pb::getPuX() const
+Sample** PBIntra::getPred( )
 {
-	return pu->getPuX()/(comp==LUMA ? 1 : 2);
+	return IntraPred::getInstance( )->calcPred( this );
 }
 
-int Pb::getPuY() const
+Sample **PBIntra::getPredForceRef( Sample* leftRefs, Sample* topRefs, Sample corner )
 {
-	return pu->getPuY()/(comp==LUMA ? 1 : 2);
+	return IntraPred::getInstance( )->calcPredForceRefs( this, leftRefs, topRefs, corner );
 }
 
-int Pb::getCorner() const
+Bool PBIntra::calcPuAvail( const Int targetPuX, const Int targetPuY ) const
 {
-	int puX = getPuX(), puY = getPuY();
-	int cornerRef = SeqParams::getInstance()->getDefVal(comp);
-	if (calcPuAvail(puX - 1, puY - 1))
-		cornerRef = getReconRef(CORNER_DIR);
-	else if (calcPuAvail(puX - 1, puY))
-		cornerRef = getReconRef(LEFT_DIR);
-	else if (calcPuAvail(puX, puY - 1))
-		cornerRef = getReconRef(TOP_DIR);
-	return cornerRef;
-}
+	UInt picWidth = SeqParams( )->getPicWidth( ) / ( itsComp == LUMA ? 1 : 2 );
+	UInt picHeight = SeqParams( )->getPicHeight( ) / ( itsComp == LUMA ? 1 : 2 );
 
-int* Pb::getSideRefs(const Direction dir) const
-{
-	assert(dir != CORNER_DIR);
+	bool puOutsidePic = ( targetPuX < 0 ) || ( targetPuY < 0 ) || ( targetPuX >= picWidth ) || ( targetPuY >= picHeight );
+	bool puAlreadyCalc = getZScanIdxIn4x4( targetPuX, targetPuY ) < itsIdx;
 
-	int puSize = pu->getPuSize();
-
-	int *refs = new int [2 * puSize];
-	int puX = getPuX(), puY = getPuY();
-
-	int nghPuX = dir == LEFT_DIR ? puX - 1 : puX;
-	int nghPuY = dir == TOP_DIR ? puY - 1 : puY;
-	bool neighborAvail = calcPuAvail(nghPuX, nghPuY);
-
-	int refSubs = getRefSubs(dir);
-	for (int x = 0; x < puSize; x++)
-		refs[x] = neighborAvail ? getReconRef(dir, x) : refSubs;
-
-	nghPuX = dir == LEFT_DIR ? puX - 1 : puX + puSize;
-	nghPuY = dir == TOP_DIR ? puY - 1 : puY + puSize;
-	neighborAvail = calcPuAvail(nghPuX, nghPuY);
-
-	refSubs = refs[puSize - 1];
-	for (int x = puSize; x < 2 * puSize; x++)
-		refs[x] = neighborAvail ? getReconRef(dir, x) : refSubs;
-
-	return refs;
-}
-
-int** Pb::getPred() const
-{
-	return IntraPred::getInstance()->calcPred(this);
-}
-
-int **Pb::getPredForceRef(int *leftRefs, int *topRefs, int corner) const
-{
-	return IntraPred::getInstance()->calcPredForceRefs(this,leftRefs,topRefs,corner);
-}
-
-int Pb::getReferenceAtPosition(const Direction dir, const int offset) const
-{
-	int puX = getPuX(), puY = getPuY();
-	if (dir == LEFT_DIR && puX > 0)
-		return picRecon[puX - 1][puY + offset];
-	else if (dir == CORNER_DIR && puX > 0 && puY > 0)
-		return picRecon[puX - 1][puY - 1];
-	else if (dir == TOP_DIR && puY > 0)
-		return picRecon[puX + offset][puY - 1];
-	else 
-		return SeqParams::getInstance()->getDefVal(comp);
-}
-
-bool Pb::calcPuAvail(const int targetPuX, const int targetPuY) const
-{
-  SeqParams *seqParams = SeqParams::getInstance();
-
-  int picWidth = seqParams->getPicWidth()/(comp == LUMA ? 1 : 2);
-  int picHeight = seqParams->getPicHeight()/(comp == LUMA ? 1 : 2);
-  /*int maxCuSize = seqParams->getMaxCuSize()/(comp == LUMA ? 1 : 2);*/
-  int puX = pu->getPuX()/(comp == LUMA ? 1 : 2);
-  int puY = pu->getPuY()/(comp == LUMA ? 1 : 2);
-
-  bool puOutsidePic = (targetPuX < 0) || (targetPuY < 0) || (targetPuX >= picWidth) || (targetPuY >= picHeight);
-  /*bool puFromNextCu = ((targetPuX - targetPuY >= maxCuSize) && (targetPuY >= puY)) || (targetPuY - puY >= maxCuSize);
-	bool puAlreadyCalc = calcPuIdx(targetPuX % maxCuSize, targetPuY % maxCuSize) < puIdx;*/
-  bool puFromPrevCu = (targetPuX < puX) || (targetPuY < puY);
-  
-	if(puOutsidePic)
+	if( puOutsidePic || !puAlreadyCalc )
 		return false;
-  if (puFromPrevCu )
-    return true;
-  else
-    return false;
+
+	return true;
 }
 
-int Pb::getReconRef(const Direction dir, const int offset) const
+UShort PBIntra::getReferenceValue( const IntraDirection dir, const UInt offset ) const
 {
-  int puX = getPuX(), puY = getPuY();
-  if (dir == LEFT_DIR)
-    return picRecon[puX - 1][puY + offset];
-  else if (dir == CORNER_DIR)
-    return picRecon[puX - 1][puY - 1];
-  else
-    return picRecon[puX + offset][puY - 1];
+	if( dir == INTRA_DIR_LEFT )
+		return itsPicRecon[ itsX - 1 ][ itsY + offset ];
+	else if( dir == INTRA_DIR_CORNER )
+		return itsPicRecon[ itsX - 1 ][ itsY - 1 ];
+	else
+		return itsPicRecon[ itsX + offset ][ itsY - 1 ];
 }
 
-int Pb::getRefSubs(const Direction dir) const
+Void PBIntra::calcReferences( )
 {
-  int puX = getPuX(), puY = getPuY();
 
-  Direction oppDir = dir == LEFT_DIR ? TOP_DIR : LEFT_DIR;
-  int oppPuX = oppDir == LEFT_DIR ? puX - 1 : puX;
-  int oppPuY = oppDir == TOP_DIR ? puY - 1 : puY;
+	Bool** sideAvailable = getEmptyMatrix<Bool>( 2, 2 * itsSize );
+	Bool cornerAvailable = false;
+	Bool atLeasOneAvailable = false;
 
-  int refSubs = SeqParams::getInstance()->getDefVal(comp);
-  if (calcPuAvail(puX - 1, puY - 1))
-    refSubs = getReconRef(CORNER_DIR);
-  else if (calcPuAvail(oppPuX, oppPuY))
-    refSubs = getReconRef(oppDir);
-  return refSubs;
+	Int X = itsX;
+	Int Y = itsY;
+	//corner
+	cornerAvailable = calcPuAvail( X - 1, Y - 1 );
+	if( cornerAvailable )
+	{
+		itsCornerReference = itsPicRecon[ X - 1 ][ Y - 1 ];
+		atLeasOneAvailable = true;
+	}
+
+	UInt offsetLimit = 2 * itsSize;
+
+	for( UInt offset = 0; offset < offsetLimit; ++offset )
+	{
+		//left
+		sideAvailable[ INTRA_DIR_LEFT ][ offset ] = calcPuAvail( X - 1, Y + offset );
+		if( sideAvailable[ INTRA_DIR_LEFT ][ offset ] )
+		{
+			itsSideReferences[ INTRA_DIR_LEFT ][ offset ] = getReferenceValue( INTRA_DIR_LEFT, offset );
+			atLeasOneAvailable = true;
+		}
+
+		//up
+		sideAvailable[ INTRA_DIR_TOP ][ offset ] = calcPuAvail( X + offset, Y - 1 );
+		if( sideAvailable[ INTRA_DIR_TOP ][ offset ] )
+		{
+			itsSideReferences[ INTRA_DIR_TOP ][ offset ] = getReferenceValue( INTRA_DIR_TOP, offset );
+			atLeasOneAvailable = true;
+		}
+	}
+
+	if( !atLeasOneAvailable )
+	{
+		Sample def = SeqParams( )->getDefaultSampleValue( itsComp );
+		itsCornerReference = def;
+		for( UInt offset = 0; offset < offsetLimit; ++offset )
+		{
+			itsSideReferences[ INTRA_DIR_LEFT ][ offset ] = def;
+			itsSideReferences[ INTRA_DIR_TOP ][ offset ] = def;
+		}
+	}
+	else
+	{
+		fillMissingReferences( sideAvailable, cornerAvailable );
+	}
+
+	delete[] sideAvailable[ INTRA_DIR_LEFT ];
+	delete[] sideAvailable[ INTRA_DIR_TOP ];
+	delete[] sideAvailable;
+
+	LOG( "RECO" ) << "Probki referencyjne:" << std::endl << "Corner: " << itsCornerReference << std::endl;
+	printMatrix( itsSideReferences, 2, 2*itsSize, LOG( "RECO" ) );
+	itsReferencesReady = true;
+}
+
+Void PBIntra::fillMissingReferences( Bool** sideAvailable, Bool cornerAvailable )
+{
+	if( sideAvailable[ INTRA_DIR_LEFT ][ 2 * itsSize - 1 ] == false )
+	{
+		for( Int idx = 2 * itsSize - 2; idx >= 0; --idx )
+		{
+			//scan left
+			if( sideAvailable[ INTRA_DIR_LEFT ][ idx ] )
+			{
+				itsSideReferences[ INTRA_DIR_LEFT ][ 2 * itsSize - 1 ] = itsSideReferences[ INTRA_DIR_LEFT ][ idx ];
+				sideAvailable[ INTRA_DIR_LEFT ][ 2 * itsSize - 1 ] = true;
+				break;
+			}
+		}
+
+		if( sideAvailable[ INTRA_DIR_LEFT ][ 2 * itsSize - 1 ] == false && cornerAvailable )
+		{
+			itsSideReferences[ INTRA_DIR_LEFT ][ 2 * itsSize - 1 ] = itsCornerReference;
+			sideAvailable[ INTRA_DIR_LEFT ][ 2 * itsSize - 1 ] = true;
+		}
+
+		if( sideAvailable[ INTRA_DIR_LEFT ][ 2 * itsSize - 1 ] == false )
+		{
+			UInt idxLimit = 2 * itsSize;
+			for( UInt idx = 0; idx < idxLimit; ++idx )
+			{
+				//scan top
+				if( sideAvailable[ INTRA_DIR_TOP ][ idx ] )
+				{
+					itsSideReferences[ INTRA_DIR_LEFT ][ 2 * itsSize - 1 ] = itsSideReferences[ INTRA_DIR_TOP ][ idx ];
+					sideAvailable[ INTRA_DIR_TOP ][ 2 * itsSize - 1 ] = true;
+					break;
+				}
+			}
+		}
+	}
+	for( Int idx = 2 * itsSize - 2; idx >= 0; --idx )
+	{
+		if( !sideAvailable[ INTRA_DIR_LEFT ][ idx ] )
+		{
+			itsSideReferences[ INTRA_DIR_LEFT ][ idx ] = itsSideReferences[ INTRA_DIR_LEFT ][ idx + 1 ];
+		}
+	}
+	if( !cornerAvailable )
+		itsCornerReference = itsSideReferences[ INTRA_DIR_LEFT ][ 0 ];
+	if( !sideAvailable[ INTRA_DIR_TOP ][ 0 ] )
+		itsSideReferences[ INTRA_DIR_TOP ][ 0 ] = itsCornerReference;
+	UInt idxLimit = 2 * itsSize;
+	for( UInt idx = 1; idx < idxLimit; ++idx )
+	{
+		if( !sideAvailable[ INTRA_DIR_TOP ][ idx ] )
+		{
+			itsSideReferences[ INTRA_DIR_TOP ][ idx ] = itsSideReferences[ INTRA_DIR_TOP ][ idx - 1 ];
+		}
+	}
+}
+
+Void PBIntra::calcAndWritePredictionToCU( PUIntra* mainPU )
+{
+	itsPredictionTarget = mainPU->getCu( )->getPredictionMatrix( itsComp );
+	itsModeIdx = mainPU->getModeIdx( itsComp );
+
+	Sample** pred = this->getPred( );
+	UInt shift = (itsComp == LUMA ? 0 : 1);
+	UInt offsetX = ( mainPU->getX( ) - mainPU->getCu( )->getX( ) ) >> shift;
+	UInt offsetY = ( mainPU->getY( ) - mainPU->getCu( )->getY( ) ) >> shift;
+	for( UInt x = offsetX; x < offsetX + itsSize; ++x )
+	{
+		for( UInt y = offsetY; y < offsetY + itsSize; ++y )
+		{
+			itsPredictionTarget[ x ][ y ] = pred[ x - offsetX ][ y - offsetY ];
+		}
+	}
+	deleteMatrix( pred, itsSize );
+}
+
+Void PBIntra::printDescription( )
+{
+	LOG( "PART" ) << "PBIntra[" << getX( ) << "][" << getY( ) << "], size: " << getSize( ) << ", comp: " << itsComp << std::endl;
 }
